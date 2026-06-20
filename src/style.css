@@ -485,6 +485,12 @@ body {
   border: 2px solid white;
 }
 
+.marker.target-zone {
+  background-color: rgba(255, 59, 48, 0.2);
+  border: 1px dashed var(--color-accent-red);
+  box-shadow: none;
+}
+
 .map-controls {
   display: flex;
   gap: 8px;

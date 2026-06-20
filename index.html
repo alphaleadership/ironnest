@@ -157,9 +157,10 @@
           <div class="panel-content map-wrapper">
             <canvas id="tactical-map" width="800" height="400"></canvas>
             <div class="map-legend">
-              <span class="legend-item"><span class="marker nest"></span> Iron Nest</span>
-              <span class="legend-item"><span class="marker target"></span> <span data-i18n="histTarget">Cible</span></span>
-              <span class="legend-display" id="coord-under-cursor">Curseur: --</span>
+               <span class="legend-item"><span class="marker nest"></span> Iron Nest</span>
+               <span class="legend-item"><span class="marker target"></span> <span data-i18n="histTarget">Cible</span></span>
+               <span class="legend-item"><span class="marker target-zone"></span> <span data-i18n="legendZone">Zone d'impact</span></span>
+               <span class="legend-display" id="coord-under-cursor">Curseur: --</span>
             </div>
           </div>
         </section>
@@ -193,6 +194,10 @@
                 <div class="readout-box">
                   <span class="readout-label" data-i18n="distance">DISTANCE (RANGE)</span>
                   <span class="readout-value highlight-amber" id="distance-value">1.41 km</span>
+                </div>
+                <div class="readout-box">
+                  <span class="readout-label" data-i18n="impactZone">ZONE D'IMPACT</span>
+                  <span class="readout-value highlight-amber" id="dispersion-value">Ø 120m</span>
                 </div>
               </div>
             </div>
