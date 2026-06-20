@@ -40,6 +40,10 @@ const mapModeTargetBtn = document.getElementById('map-mode-target');
 const sysTimeDisplay = document.getElementById('sys-time');
 const dbStatusBadge = document.getElementById('db-status-badge');
 
+const salvoModeSel = document.getElementById('salvo-mode');
+const salvoCountInput = document.getElementById('salvo-count');
+const salvoCountField = document.getElementById('salvo-count-field');
+
 // Langue boutons
 const btnLangFr = document.getElementById('lang-fr');
 const btnLangEn = document.getElementById('lang-en');
@@ -176,8 +180,12 @@ function calculateBalistics() {
   // Recommandation d'obus
   updateOrdnanceRecommendation();
 
+  // Mode Salve
+  const isSalvo = salvoModeSel.value === 'salvo';
+  const salvoCount = parseInt(salvoCountInput.value) || 5;
+
   // Redessiner la carte avec la zone de dispersion
-  drawMap(nest, target, dispersion);
+  drawMap(nest, target, dispersion, isSalvo, salvoCount);
 }
 
 // Mettre à jour la table d'élévation
@@ -229,7 +237,7 @@ function updateOrdnanceRecommendation() {
 }
 
 // Dessiner la carte tactique sur le Canvas
-function drawMap(nest, target, dispersion = 0) {
+function drawMap(nest, target, dispersion = 0, isSalvo = false, salvoCount = 5) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
@@ -343,6 +351,49 @@ function drawMap(nest, target, dispersion = 0) {
       // Remplissage translucide rouge
       ctx.fillStyle = 'rgba(255, 59, 48, 0.08)';
       ctx.fill();
+
+      // Dessiner les impacts de la Salve si active
+      if (isSalvo) {
+        // Graine déterministe simple basée sur les coordonnées
+        let seed = nest.x + nest.y + target.x + target.y;
+        const seededRandom = () => {
+          const x = Math.sin(seed++) * 10000;
+          return x - Math.floor(x);
+        };
+
+        for (let s = 0; s < salvoCount; s++) {
+          const angle = seededRandom() * Math.PI * 2;
+          // Distribution gaussienne simple (moyenne de 2 variables pour avoir plus d'impacts au centre)
+          const distRatio = (seededRandom() + seededRandom()) / 2;
+          const dist = distRatio * dispersion;
+
+          // Décalage en mètres
+          const dxMeters = Math.cos(angle) * dist;
+          const dyMeters = Math.sin(angle) * dist;
+
+          // Conversion en pixels
+          const cellW = w / 20;
+          const impactPixelX = targetPixelX + (dxMeters / 1000) * cellW;
+          const impactPixelY = targetPixelY - (dyMeters / 1000) * cellW;
+
+          // Dessiner le point d'impact
+          ctx.beginPath();
+          ctx.arc(impactPixelX, impactPixelY, 3, 0, Math.PI * 2);
+          ctx.fillStyle = s === 0 ? 'rgba(255, 170, 0, 0.9)' : 'rgba(255, 59, 48, 0.8)'; // Couleur distincte pour le premier obus
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+
+          // Petit réticule d'impact
+          ctx.beginPath();
+          ctx.moveTo(impactPixelX - 4, impactPixelY); ctx.lineTo(impactPixelX + 4, impactPixelY);
+          ctx.moveTo(impactPixelX, impactPixelY - 4); ctx.lineTo(impactPixelX, impactPixelY + 4);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
     }
   }
 }
@@ -414,8 +465,21 @@ mapModeTargetBtn.addEventListener('click', () => {
 
 // Écouteurs de changement pour les contrôles de formulaire
 [nestColSel, nestRowSel, nestSubXInput, nestSubYInput,
- targetColSel, targetRowSel, targetSubXInput, targetSubYInput, ordnanceTypeSel].forEach(elem => {
+ targetColSel, targetRowSel, targetSubXInput, targetSubYInput, 
+ ordnanceTypeSel, salvoModeSel, salvoCountInput].forEach(elem => {
   elem.addEventListener('input', calculateBalistics);
+});
+
+// Écouteur spécifique pour le mode Salve
+salvoModeSel.addEventListener('change', () => {
+  if (salvoModeSel.value === 'salvo') {
+    salvoCountField.style.visibility = 'visible';
+    salvoCountField.style.opacity = '1';
+  } else {
+    salvoCountField.style.visibility = 'hidden';
+    salvoCountField.style.opacity = '0';
+  }
+  calculateBalistics();
 });
 
 // Gérer le bouton Reset
@@ -499,10 +563,16 @@ btnSave.addEventListener('click', async () => {
   }
 
   const solutionsStr = solutions.join(' | ') || 'Hors limite';
-  const munitionStr = ordnanceTypeSel.value.toUpperCase();
+  
+  const isSalvo = salvoModeSel.value === 'salvo';
+  const salvoCount = parseInt(salvoCountInput.value) || 5;
+  const munitionBase = ordnanceTypeSel.value.toUpperCase();
+  const munitionStr = isSalvo ? `${munitionBase} (SALVE x${salvoCount})` : munitionBase;
+
   const rawData = {
     nestCol, nestRow, nestSubX, nestSubY,
-    targetCol, targetRow, targetSubX, targetSubY
+    targetCol, targetRow, targetSubX, targetSubY,
+    isSalvo, salvoCount
   };
 
   if (supabase) {
@@ -564,6 +634,17 @@ window.loadRecord = function(id) {
     targetRowSel.value = record.raw.targetRow;
     targetSubXInput.value = record.raw.targetSubX;
     targetSubYInput.value = record.raw.targetSubY;
+
+    if (record.raw.isSalvo) {
+      salvoModeSel.value = 'salvo';
+      salvoCountInput.value = record.raw.salvoCount;
+      salvoCountField.style.visibility = 'visible';
+      salvoCountField.style.opacity = '1';
+    } else {
+      salvoModeSel.value = 'single';
+      salvoCountField.style.visibility = 'hidden';
+      salvoCountField.style.opacity = '0';
+    }
 
     calculateBalistics();
   }
