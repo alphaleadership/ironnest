@@ -226,7 +226,7 @@ function renderTargetFields() {
 
 // Ajouter une cible
 function addTarget() {
-  if (targets.length < 5) {
+  if (targets.length < 100) {
     const lastTarget = targets[targets.length - 1] || { col: 11, row: 6, subX: 0, subY: 0 };
     targets.push({
       col: Math.min(19, lastTarget.col + 1),
