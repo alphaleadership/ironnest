@@ -5,6 +5,10 @@ import { supabase } from './supabase.js';
 // Gestion de la langue (i18n)
 let currentLang = localStorage.getItem('ironnest_lang') || 'fr';
 
+// État global Steam
+let currentSteamId = localStorage.getItem('ironnest_steam_id') || null;
+let currentSteamProfile = null;
+
 // Références des éléments statiques du DOM
 const nestColSel = document.getElementById('nest-col');
 const nestRowSel = document.getElementById('nest-row');
@@ -39,6 +43,13 @@ const salvoCountInput = document.getElementById('salvo-count');
 const salvoCountField = document.getElementById('salvo-count-field');
 const btnAddTarget = document.getElementById('btn-add-target');
 const targetsListContainer = document.getElementById('targets-list-container');
+
+// Éléments d'authentification Steam
+const btnSteamLogin = document.getElementById('btn-steam-login');
+const steamProfileContainer = document.getElementById('steam-profile');
+const steamAvatar = document.getElementById('steam-avatar');
+const steamName = document.getElementById('steam-name');
+const btnSteamLogout = document.getElementById('btn-steam-logout');
 
 // Langue boutons
 const btnLangFr = document.getElementById('lang-fr');
@@ -202,7 +213,6 @@ function renderTargetFields() {
     // Activer cette cible au clic sur son bloc
     rowItem.addEventListener('click', () => {
       activeTargetIndex = index;
-      // Mettre en évidence
       document.querySelectorAll('.target-row-item').forEach((item, idx) => {
         item.style.border = idx === activeTargetIndex ? '1px solid var(--color-accent-amber)' : '1px solid transparent';
         item.style.backgroundColor = idx === activeTargetIndex ? 'rgba(255, 170, 0, 0.03)' : 'transparent';
@@ -217,7 +227,6 @@ function renderTargetFields() {
 // Ajouter une cible
 function addTarget() {
   if (targets.length < 5) {
-    // Copier la dernière cible ou mettre des valeurs par défaut
     const lastTarget = targets[targets.length - 1] || { col: 11, row: 6, subX: 0, subY: 0 };
     targets.push({
       col: Math.min(19, lastTarget.col + 1),
@@ -245,7 +254,6 @@ function removeTarget(index) {
 function applyLanguage() {
   const t = translations[currentLang];
   
-  // Parcourir tous les éléments ayant l'attribut data-i18n
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key]) {
@@ -257,7 +265,6 @@ function applyLanguage() {
     }
   });
 
-  // Mettre à jour la classe active sur les boutons de langue
   if (currentLang === 'fr') {
     btnLangFr.classList.add('active');
     btnLangEn.classList.remove('active');
@@ -303,17 +310,14 @@ function calculateBalistics() {
   const nestSubX = parseInt(nestSubXInput.value) || 0;
   const nestSubY = parseInt(nestSubYInput.value) || 0;
 
-  // Affichage texte des coordonnées du nid
   nestDisplay.textContent = formatCoord(nestCol, nestRow, nestSubX, nestSubY);
 
   const nest = getGlobalCoords(nestCol, nestRow, nestSubX, nestSubY);
 
-  // Évaluation de la dispersion
   const targetType = ordnanceTypeSel.value;
   const isSalvo = salvoModeSel.value === 'salvo';
   const salvoCount = parseInt(salvoCountInput.value) || 5;
 
-  // Pour chaque cible, calculer les solutions
   const solutionsList = [];
 
   targets.forEach((targetObj, index) => {
@@ -344,7 +348,6 @@ function calculateBalistics() {
     });
   });
 
-  // Mettre à jour l'affichage de la cible ACTIVE pour la boussole et le readout principal
   const activeSol = solutionsList[activeTargetIndex] || solutionsList[0];
   if (activeSol) {
     distanceDisplay.textContent = `${activeSol.distanceKm.toFixed(2)} km`;
@@ -353,17 +356,12 @@ function calculateBalistics() {
     needle.style.transform = `translate(-50%, -50%) rotate(${activeSol.bearingDeg}deg)`;
   }
 
-  // Mettre à jour la table des élévations de toutes les cibles
   updateElevationTable(solutionsList);
-  
-  // Recommandation d'obus
   updateOrdnanceRecommendation();
-
-  // Redessiner la carte
   drawMap(nest, solutionsList, isSalvo, salvoCount);
 }
 
-// Mettre à jour la table des élévations (Multi-cibles)
+// Mettre à jour la table des élévations
 function updateElevationTable(solutionsList) {
   elevationTableBody.innerHTML = '';
   
@@ -374,7 +372,6 @@ function updateElevationTable(solutionsList) {
       tr.style.backgroundColor = 'rgba(255, 170, 0, 0.05)';
     }
 
-    // Calculer les charges d'élévation
     const solutionsText = [];
     for (let c = 1; c <= 4; c++) {
       const elev = (12 / c) * sol.distanceKm;
@@ -390,7 +387,6 @@ function updateElevationTable(solutionsList) {
       <td class="highlight-amber">${solutionsText.join(' | ') || 'N/A'}</td>
     `;
 
-    // Cliquer sur une ligne de solution active cette cible
     tr.addEventListener('click', () => {
       activeTargetIndex = sol.index;
       renderTargetFields();
@@ -416,21 +412,19 @@ function updateOrdnanceRecommendation() {
   ordnanceRecommendation.innerHTML = text;
 }
 
-// Dessiner la carte tactique sur le Canvas (Support Multi-cibles)
+// Dessiner la carte tactique
 function drawMap(nest, solutionsList, isSalvo, salvoCount) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
 
-  // Effacer
   ctx.fillStyle = '#050608';
   ctx.fillRect(0, 0, w, h);
 
   const cellW = w / 20;
   const cellH = h / 10;
 
-  // Lignes verticales
   ctx.strokeStyle = 'rgba(57, 255, 20, 0.08)';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 20; i++) {
@@ -440,7 +434,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
     ctx.stroke();
   }
 
-  // Lignes horizontales
   for (let j = 0; j <= 10; j++) {
     ctx.beginPath();
     ctx.moveTo(0, j * cellH);
@@ -448,7 +441,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
     ctx.stroke();
   }
 
-  // Affichage des index A..T et 1..10
   ctx.fillStyle = 'rgba(57, 255, 20, 0.4)';
   ctx.font = '11px Share Tech Mono';
   for (let i = 0; i < 20; i++) {
@@ -461,7 +453,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
   const nestPixelX = (nest.x / 200) * w;
   const nestPixelY = h - (nest.y / 100) * h;
 
-  // Dessiner chaque cible
   solutionsList.forEach((sol) => {
     const target = getGlobalCoords(sol.targetObj.col, sol.targetObj.row, sol.targetObj.subX, sol.targetObj.subY);
     const targetPixelX = (target.x / 200) * w;
@@ -469,7 +460,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
 
     const isActive = sol.index === activeTargetIndex;
 
-    // Ligne de visée pointillée
     ctx.beginPath();
     ctx.strokeStyle = isActive ? 'rgba(255, 170, 0, 0.6)' : 'rgba(255, 170, 0, 0.2)';
     ctx.lineWidth = isActive ? 2 : 1;
@@ -479,7 +469,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Dessiner la Cible
     ctx.beginPath();
     ctx.arc(targetPixelX, targetPixelY, isActive ? 6 : 5, 0, Math.PI * 2);
     ctx.fillStyle = isActive ? '#ff3b30' : 'rgba(255, 59, 48, 0.5)';
@@ -488,7 +477,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
     ctx.lineWidth = isActive ? 1.5 : 1;
     ctx.stroke();
 
-    // Réticule
     ctx.beginPath();
     const retSize = isActive ? 14 : 10;
     ctx.moveTo(targetPixelX - retSize, targetPixelY); ctx.lineTo(targetPixelX + retSize, targetPixelY);
@@ -497,7 +485,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Zone d'impact
     if (sol.dispersion > 0) {
       const pixelRadius = (sol.dispersion / 1000) * cellW;
 
@@ -513,7 +500,6 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
       ctx.fill();
     }
 
-    // Dessiner la Salve de cette cible
     if (isSalvo) {
       let seed = nest.x + nest.y + target.x + target.y;
       const seededRandom = () => {
@@ -539,13 +525,11 @@ function drawMap(nest, solutionsList, isSalvo, salvoCount) {
       }
     }
     
-    // Numéro de la cible
     ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)';
     ctx.font = 'bold 9px Arial';
     ctx.fillText(`#${sol.index + 1}`, targetPixelX + 8, targetPixelY - 8);
   });
 
-  // Dessiner le Nest (toujours au premier plan)
   ctx.beginPath();
   ctx.arc(nestPixelX, nestPixelY, 8, 0, Math.PI * 2);
   ctx.fillStyle = '#39ff14';
@@ -571,11 +555,9 @@ function handleMapInteraction(e) {
   const y = (e.clientY - rect.top) * scaleY;
   const t = translations[currentLang];
 
-  // Case de la grille
   const colIndex = Math.floor(x / (canvas.width / 20));
   const rowIndex = 10 - Math.floor(y / (canvas.height / 10));
 
-  // Coordonnée fine
   const cellW = canvas.width / 20;
   const cellH = canvas.height / 10;
   const relativeX = x % cellW;
@@ -598,7 +580,6 @@ function handleMapInteraction(e) {
       nestSubXInput.value = finalSubX;
       nestSubYInput.value = finalSubY;
     } else {
-      // Déplacer la cible ACTIVE
       if (targets[activeTargetIndex]) {
         targets[activeTargetIndex].col = finalCol;
         targets[activeTargetIndex].row = finalRow;
@@ -618,7 +599,7 @@ canvas.addEventListener('mouseleave', () => {
   cursorCoordDisplay.textContent = `${t.cursor || 'Cursor'}: --`;
 });
 
-// Gérer le changement de mode de clic sur la carte
+// Mode de clic sur la carte
 mapModeNestBtn.addEventListener('click', () => {
   mapMode = 'nest';
   mapModeNestBtn.classList.add('active');
@@ -631,12 +612,12 @@ mapModeTargetBtn.addEventListener('click', () => {
   mapModeNestBtn.classList.remove('active');
 });
 
-// Écouteurs de changement pour les contrôles de formulaire statiques
+// Écouteurs de changement pour les contrôles de formulaire
 [nestColSel, nestRowSel, nestSubXInput, nestSubYInput, ordnanceTypeSel, salvoModeSel, salvoCountInput].forEach(elem => {
   elem.addEventListener('input', calculateBalistics);
 });
 
-// Écouteur spécifique pour le mode Salve (affiche/cache le bouton + Cible)
+// Écouteur pour le mode Salve
 salvoModeSel.addEventListener('change', () => {
   if (salvoModeSel.value === 'salvo') {
     salvoCountField.style.visibility = 'visible';
@@ -646,7 +627,6 @@ salvoModeSel.addEventListener('change', () => {
     salvoCountField.style.visibility = 'hidden';
     salvoCountField.style.opacity = '0';
     btnAddTarget.style.display = 'none';
-    // Repasser à une cible unique
     targets = [targets[0]];
     activeTargetIndex = 0;
     renderTargetFields();
@@ -654,10 +634,9 @@ salvoModeSel.addEventListener('change', () => {
   calculateBalistics();
 });
 
-// Bouton d'ajout de cible
 btnAddTarget.addEventListener('click', addTarget);
 
-// Gérer le bouton Reset
+// Reset
 btnReset.addEventListener('click', () => {
   nestColSel.value = 10;
   nestRowSel.value = 5;
@@ -676,15 +655,24 @@ btnReset.addEventListener('click', () => {
   calculateBalistics();
 });
 
-// Charger l'historique
+// Charger l'historique (Lier avec steam_id si connecté)
 async function loadHistory() {
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('missions')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
+        .order('created_at', { ascending: false });
+      
+      // Filtrer par steam_id si l'utilisateur est connecté à Steam
+      if (currentSteamId) {
+        query = query.eq('steam_id', currentSteamId);
+      } else {
+        // Sinon, charger uniquement les cibles anonymes globales (steam_id est null)
+        query = query.is('steam_id', null);
+      }
+
+      const { data, error } = await query.limit(20);
       
       if (error) throw error;
 
@@ -701,15 +689,15 @@ async function loadHistory() {
       }));
     } catch (err) {
       console.error('Supabase: Échec de chargement des cibles, repli sur localStorage.', err);
-      targetHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+      targetHistory = JSON.parse(localStorage.getItem(currentSteamId ? `ironnest_history_${currentSteamId}` : 'ironnest_history') || '[]');
     }
   } else {
-    targetHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+    targetHistory = JSON.parse(localStorage.getItem(currentSteamId ? `ironnest_history_${currentSteamId}` : 'ironnest_history') || '[]');
   }
   renderHistory();
 }
 
-// Enregistrer la cible
+// Enregistrer la cible (Lier avec steam_id si connecté)
 btnSave.addEventListener('click', async () => {
   const nestCol = parseInt(nestColSel.value);
   const nestRow = parseInt(nestRowSel.value);
@@ -718,7 +706,6 @@ btnSave.addEventListener('click', async () => {
 
   const nest = getGlobalCoords(nestCol, nestRow, nestSubX, nestSubY);
   
-  // Compiler les infos de toutes les cibles
   const targetsStrList = [];
   let totalDistance = 0;
   let totalBearing = 0;
@@ -739,7 +726,6 @@ btnSave.addEventListener('click', async () => {
 
   const targetStr = targetsStrList.join(' | ');
 
-  // Solutions récapitulatives
   const solutionsTextList = [];
   for (let c = 1; c <= 4; c++) {
     const elev = (12 / c) * avgDistance;
@@ -752,7 +738,6 @@ btnSave.addEventListener('click', async () => {
   const isSalvo = salvoModeSel.value === 'salvo';
   const salvoCount = parseInt(salvoCountInput.value) || 5;
   const munitionBase = ordnanceTypeSel.value.toUpperCase();
-  // Mentionner si c'est une salve multi-cibles
   const munitionStr = isSalvo 
     ? `${munitionBase} (SALVE x${salvoCount} / ${targets.length} CIBLES)` 
     : munitionBase;
@@ -766,17 +751,24 @@ btnSave.addEventListener('click', async () => {
 
   if (supabase) {
     try {
+      const record = {
+        nest_coord: formatCoord(nestCol, nestRow, nestSubX, nestSubY),
+        target_coord: targetStr,
+        distance: avgDistance,
+        bearing: avgBearing,
+        solutions: solutionsStr,
+        munition: munitionStr,
+        raw_data: rawData
+      };
+
+      // Si l'utilisateur est connecté à Steam, lier l'enregistrement
+      if (currentSteamId) {
+        record.steam_id = currentSteamId;
+      }
+
       const { error } = await supabase
         .from('missions')
-        .insert([{
-          nest_coord: formatCoord(nestCol, nestRow, nestSubX, nestSubY),
-          target_coord: targetStr,
-          distance: avgDistance,
-          bearing: avgBearing,
-          solutions: solutionsStr,
-          munition: munitionStr,
-          raw_data: rawData
-        }]);
+        .insert([record]);
 
       if (error) throw error;
     } catch (err) {
@@ -792,7 +784,8 @@ btnSave.addEventListener('click', async () => {
 
 // Helper de sauvegarde locale
 function saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetStr, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData) {
-  const localHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+  const key = currentSteamId ? `ironnest_history_${currentSteamId}` : 'ironnest_history';
+  const localHistory = JSON.parse(localStorage.getItem(key) || '[]');
   const newRecord = {
     id: Date.now(),
     date: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
@@ -806,7 +799,7 @@ function saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetStr, distan
   };
   localHistory.unshift(newRecord);
   if (localHistory.length > 20) localHistory.pop();
-  localStorage.setItem('ironnest_history', JSON.stringify(localHistory));
+  localStorage.setItem(key, JSON.stringify(localHistory));
 }
 
 // Charger un enregistrement historique
@@ -821,7 +814,6 @@ window.loadRecord = function(id) {
     if (record.raw.targets) {
       targets = JSON.parse(JSON.stringify(record.raw.targets));
     } else if (record.raw.targetCol !== undefined) {
-      // Compatibilité ancienne version
       targets = [{
         col: record.raw.targetCol,
         row: record.raw.targetRow,
@@ -864,9 +856,10 @@ window.deleteRecord = async function(id) {
       console.error('Supabase: Échec de suppression.', err);
     }
   } else {
-    let localHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+    const key = currentSteamId ? `ironnest_history_${currentSteamId}` : 'ironnest_history';
+    let localHistory = JSON.parse(localStorage.getItem(key) || '[]');
     localHistory = localHistory.filter(r => r.id !== id);
-    localStorage.setItem('ironnest_history', JSON.stringify(localHistory));
+    localStorage.setItem(key, JSON.stringify(localHistory));
   }
   await loadHistory();
 };
@@ -899,6 +892,149 @@ function renderHistory() {
   });
 }
 
+// ---- Gestion de l'authentification Steam OpenID ----
+
+// Rediriger vers l'authentification Steam
+btnSteamLogin.addEventListener('click', () => {
+  const returnUrl = window.location.origin + window.location.pathname;
+  const steamOpenIdUrl = 'https://steamcommunity.com/openid/login?' +
+    'openid.ns=http://specs.openid.net/auth/2.0' +
+    '&openid.mode=checkid_setup' +
+    `&openid.return_to=${encodeURIComponent(returnUrl)}` +
+    `&openid.realm=${encodeURIComponent(returnUrl)}` +
+    '&openid.identity=http://specs.openid.net/auth/2.0/identifier_select' +
+    '&openid.claimed_id=http://specs.openid.net/auth/2.0/identifier_select';
+  
+  window.location.href = steamOpenIdUrl;
+});
+
+// Déconnexion Steam
+btnSteamLogout.addEventListener('click', () => {
+  currentSteamId = null;
+  currentSteamProfile = null;
+  localStorage.removeItem('ironnest_steam_id');
+  updateSteamUI();
+  loadHistory();
+});
+
+// Vérifier si retour de Steam OpenID
+async function checkSteamOpenIDCallback() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const claimedId = urlParams.get('openid.claimed_id');
+  
+  if (claimedId) {
+    // L'identifiant claimedId ressemble à : https://steamcommunity.com/openid/id/76561198031234567
+    const steamId = claimedId.substring(claimedId.lastIndexOf('/') + 1);
+    
+    if (steamId && /^\d+$/.test(steamId)) {
+      currentSteamId = steamId;
+      localStorage.setItem('ironnest_steam_id', steamId);
+      
+      // Nettoyer les paramètres OpenID de l'URL pour garder le site propre
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Synchroniser le profil avec Supabase
+      await syncSteamProfileWithSupabase(steamId);
+    }
+  }
+  
+  updateSteamUI();
+  if (currentSteamId && !currentSteamProfile) {
+    await fetchProfileFromSupabase(currentSteamId);
+  }
+}
+
+// Synchroniser ou créer un profil joueur dans Supabase
+async function syncSteamProfileWithSupabase(steamId) {
+  if (!supabase) return;
+  
+  try {
+    // 1. Chercher si le profil existe déjà
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('steam_id', steamId)
+      .maybeSingle();
+      
+    if (error) throw error;
+    
+    if (profile) {
+      currentSteamProfile = profile;
+    } else {
+      // 2. Si le profil n'existe pas, créer un profil par défaut temporaire (style recru militaire dieselpunk)
+      const defaultName = `RECRUE #${steamId.substring(steamId.length - 6)}`;
+      const defaultAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${steamId}`;
+      
+      const { data: newProfile, error: insertError } = await supabase
+        .from('profiles')
+        .insert([{
+          steam_id: steamId,
+          personaname: defaultName,
+          avatar: defaultAvatar
+        }])
+        .select()
+        .single();
+        
+      if (insertError) throw insertError;
+      currentSteamProfile = newProfile;
+    }
+  } catch (err) {
+    console.error('Supabase: Échec de synchronisation du profil Steam.', err);
+  }
+}
+
+// Charger le profil depuis Supabase au démarrage
+async function fetchProfileFromSupabase(steamId) {
+  if (!supabase) {
+    // Hors ligne / Sans db : Création d'un profil fictif local
+    currentSteamProfile = {
+      steam_id: steamId,
+      personaname: `RECRUE #${steamId.substring(steamId.length - 6)}`,
+      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${steamId}`
+    };
+    updateSteamUI();
+    return;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('steam_id', steamId)
+      .maybeSingle();
+      
+    if (error) throw error;
+    if (data) {
+      currentSteamProfile = data;
+    } else {
+      await syncSteamProfileWithSupabase(steamId);
+    }
+  } catch (err) {
+    console.error('Supabase: Échec de récupération du profil.', err);
+    currentSteamProfile = {
+      steam_id: steamId,
+      personaname: `RECRUE #${steamId.substring(steamId.length - 6)}`,
+      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${steamId}`
+    };
+  }
+  updateSteamUI();
+}
+
+// Mettre à jour l'interface du profil Steam
+function updateSteamUI() {
+  if (currentSteamId && currentSteamProfile) {
+    btnSteamLogin.style.display = 'none';
+    steamProfileContainer.style.display = 'flex';
+    steamAvatar.src = currentSteamProfile.avatar || '';
+    steamName.textContent = currentSteamProfile.personaname || 'Opérateur';
+  } else {
+    btnSteamLogin.style.display = 'inline-flex';
+    steamProfileContainer.style.display = 'none';
+    steamAvatar.src = '';
+    steamName.textContent = '--';
+  }
+}
+
 // Événements boutons de langue
 btnLangFr.addEventListener('click', () => {
   currentLang = 'fr';
@@ -912,5 +1048,10 @@ btnLangEn.addEventListener('click', () => {
   applyLanguage();
 });
 
-// Initialisation au chargement
-applyLanguage();
+// Initialisation générale au démarrage
+async function init() {
+  await checkSteamOpenIDCallback();
+  applyLanguage();
+}
+
+init();
