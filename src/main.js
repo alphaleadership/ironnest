@@ -5,18 +5,12 @@ import { supabase } from './supabase.js';
 // Gestion de la langue (i18n)
 let currentLang = localStorage.getItem('ironnest_lang') || 'fr';
 
-// Références des éléments du DOM
+// Références des éléments statiques du DOM
 const nestColSel = document.getElementById('nest-col');
 const nestRowSel = document.getElementById('nest-row');
 const nestSubXInput = document.getElementById('nest-sub-x');
 const nestSubYInput = document.getElementById('nest-sub-y');
 const nestDisplay = document.getElementById('nest-global-display');
-
-const targetColSel = document.getElementById('target-col');
-const targetRowSel = document.getElementById('target-row');
-const targetSubXInput = document.getElementById('target-sub-x');
-const targetSubYInput = document.getElementById('target-sub-y');
-const targetDisplay = document.getElementById('target-global-display');
 
 const ordnanceTypeSel = document.getElementById('ordnance-type');
 const ordnanceRecommendation = document.getElementById('ordnance-recommendation');
@@ -43,6 +37,8 @@ const dbStatusBadge = document.getElementById('db-status-badge');
 const salvoModeSel = document.getElementById('salvo-mode');
 const salvoCountInput = document.getElementById('salvo-count');
 const salvoCountField = document.getElementById('salvo-count-field');
+const btnAddTarget = document.getElementById('btn-add-target');
+const targetsListContainer = document.getElementById('targets-list-container');
 
 // Langue boutons
 const btnLangFr = document.getElementById('lang-fr');
@@ -51,6 +47,10 @@ const btnLangEn = document.getElementById('lang-en');
 // Constantes pour la grille
 const COLUMNS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
 let mapMode = 'nest'; // 'nest' ou 'target'
+
+// Modèle de cibles : Tableau de cibles
+let targets = [{ col: 11, row: 6, subX: 0, subY: 0 }];
+let activeTargetIndex = 0; // Index de la cible active pour le clic sur le canvas
 
 // Historique des cibles
 let targetHistory = [];
@@ -63,6 +63,181 @@ function updateDbBadge() {
   } else {
     dbStatusBadge.textContent = currentLang === 'fr' ? 'LOCALSTORAGE (HORS LIGNE)' : 'LOCALSTORAGE (OFFLINE)';
     dbStatusBadge.className = 'db-status-badge local';
+  }
+}
+
+// Rendre la liste des formulaires pour les cibles
+function renderTargetFields() {
+  targetsListContainer.innerHTML = '';
+  const t = translations[currentLang];
+
+  targets.forEach((target, index) => {
+    const rowItem = document.createElement('div');
+    rowItem.className = `target-row-item ${index === activeTargetIndex ? 'active-target-row' : ''}`;
+    rowItem.style.border = index === activeTargetIndex ? '1px solid var(--color-accent-amber)' : '1px solid transparent';
+    rowItem.style.padding = '8px';
+    rowItem.style.borderRadius = '4px';
+    rowItem.style.marginBottom = '10px';
+    rowItem.style.backgroundColor = index === activeTargetIndex ? 'rgba(255, 170, 0, 0.03)' : 'transparent';
+    rowItem.dataset.index = index;
+
+    // Entête de la ligne
+    const header = document.createElement('div');
+    header.className = 'target-row-header';
+
+    const title = document.createElement('span');
+    title.className = 'target-index-label';
+    title.textContent = `${t.histTarget || 'Cible'} #${index + 1}`;
+
+    header.appendChild(title);
+
+    // Ajouter le bouton de suppression s'il y a plus d'une cible
+    if (targets.length > 1) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-remove-target';
+      deleteBtn.innerHTML = '✕';
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeTarget(index);
+      });
+      header.appendChild(deleteBtn);
+    }
+
+    rowItem.appendChild(header);
+
+    // Ligne d'inputs
+    const inputsRow = document.createElement('div');
+    inputsRow.className = 'inputs-row';
+
+    // Sélection COL (A-T)
+    const colField = document.createElement('div');
+    colField.className = 'input-field';
+    const colLabel = document.createElement('label');
+    colLabel.textContent = t.column || 'COL';
+    const colSelect = document.createElement('select');
+    colSelect.className = 'custom-select';
+    COLUMNS.forEach((col, idx) => {
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = col;
+      if (idx === target.col) opt.selected = true;
+      colSelect.appendChild(opt);
+    });
+    colSelect.addEventListener('input', (e) => {
+      target.col = parseInt(e.target.value);
+      calculateBalistics();
+    });
+    colField.appendChild(colLabel);
+    colField.appendChild(colSelect);
+    inputsRow.appendChild(colField);
+
+    // Sélection LIGNE (1-10)
+    const rowField = document.createElement('div');
+    rowField.className = 'input-field';
+    const rowLabel = document.createElement('label');
+    rowLabel.textContent = t.row || 'LIGNE';
+    const rowSelect = document.createElement('select');
+    rowSelect.className = 'custom-select';
+    for (let r = 1; r <= 10; r++) {
+      const opt = document.createElement('option');
+      opt.value = r;
+      opt.textContent = r;
+      if (r === target.row) opt.selected = true;
+      rowSelect.appendChild(opt);
+    }
+    rowSelect.addEventListener('input', (e) => {
+      target.row = parseInt(e.target.value);
+      calculateBalistics();
+    });
+    rowField.appendChild(rowLabel);
+    rowField.appendChild(rowSelect);
+    inputsRow.appendChild(rowField);
+
+    // Input SUB X
+    const subXField = document.createElement('div');
+    subXField.className = 'input-field';
+    const subXLabel = document.createElement('label');
+    subXLabel.textContent = t.subX || 'SUB X';
+    const subXInput = document.createElement('input');
+    subXInput.type = 'number';
+    subXInput.className = 'custom-input';
+    subXInput.min = 0;
+    subXInput.max = 9;
+    subXInput.value = target.subX;
+    subXInput.addEventListener('input', (e) => {
+      target.subX = Math.max(0, Math.min(9, parseInt(e.target.value) || 0));
+      calculateBalistics();
+    });
+    subXField.appendChild(subXLabel);
+    subXField.appendChild(subXInput);
+    inputsRow.appendChild(subXField);
+
+    // Input SUB Y
+    const subYField = document.createElement('div');
+    subYField.className = 'input-field';
+    const subYLabel = document.createElement('label');
+    subYLabel.textContent = t.subY || 'SUB Y';
+    const subYInput = document.createElement('input');
+    subYInput.type = 'number';
+    subYInput.className = 'custom-input';
+    subYInput.min = 0;
+    subYInput.max = 9;
+    subYInput.value = target.subY;
+    subYInput.addEventListener('input', (e) => {
+      target.subY = Math.max(0, Math.min(9, parseInt(e.target.value) || 0));
+      calculateBalistics();
+    });
+    subYField.appendChild(subYLabel);
+    subYField.appendChild(subYInput);
+    inputsRow.appendChild(subYField);
+
+    rowItem.appendChild(inputsRow);
+
+    // Étiquette Global
+    const displayLabel = document.createElement('div');
+    displayLabel.className = 'computed-label';
+    displayLabel.innerHTML = `GLOBAL: <span class="highlight">${formatCoord(target.col, target.row, target.subX, target.subY)}</span>`;
+    rowItem.appendChild(displayLabel);
+
+    // Activer cette cible au clic sur son bloc
+    rowItem.addEventListener('click', () => {
+      activeTargetIndex = index;
+      // Mettre en évidence
+      document.querySelectorAll('.target-row-item').forEach((item, idx) => {
+        item.style.border = idx === activeTargetIndex ? '1px solid var(--color-accent-amber)' : '1px solid transparent';
+        item.style.backgroundColor = idx === activeTargetIndex ? 'rgba(255, 170, 0, 0.03)' : 'transparent';
+      });
+      calculateBalistics();
+    });
+
+    targetsListContainer.appendChild(rowItem);
+  });
+}
+
+// Ajouter une cible
+function addTarget() {
+  if (targets.length < 5) {
+    // Copier la dernière cible ou mettre des valeurs par défaut
+    const lastTarget = targets[targets.length - 1] || { col: 11, row: 6, subX: 0, subY: 0 };
+    targets.push({
+      col: Math.min(19, lastTarget.col + 1),
+      row: lastTarget.row,
+      subX: lastTarget.subX,
+      subY: lastTarget.subY
+    });
+    activeTargetIndex = targets.length - 1;
+    renderTargetFields();
+    calculateBalistics();
+  }
+}
+
+// Supprimer une cible
+function removeTarget(index) {
+  if (targets.length > 1) {
+    targets.splice(index, 1);
+    activeTargetIndex = Math.max(0, activeTargetIndex - 1);
+    renderTargetFields();
+    calculateBalistics();
   }
 }
 
@@ -94,6 +269,7 @@ function applyLanguage() {
   }
 
   updateDbBadge();
+  renderTargetFields();
   calculateBalistics();
   loadHistory();
 }
@@ -127,98 +303,102 @@ function calculateBalistics() {
   const nestSubX = parseInt(nestSubXInput.value) || 0;
   const nestSubY = parseInt(nestSubYInput.value) || 0;
 
-  const targetCol = parseInt(targetColSel.value);
-  const targetRow = parseInt(targetRowSel.value);
-  const targetSubX = parseInt(targetSubXInput.value) || 0;
-  const targetSubY = parseInt(targetSubYInput.value) || 0;
-
-  // Affichage texte des coordonnées
+  // Affichage texte des coordonnées du nid
   nestDisplay.textContent = formatCoord(nestCol, nestRow, nestSubX, nestSubY);
-  targetDisplay.textContent = formatCoord(targetCol, targetRow, targetSubX, targetSubY);
 
-  // Coordonnées globales
   const nest = getGlobalCoords(nestCol, nestRow, nestSubX, nestSubY);
-  const target = getGlobalCoords(targetCol, targetRow, targetSubX, targetSubY);
 
-  const dx = target.x - nest.x;
-  const dy = target.y - nest.y;
-
-  // Distance en kilomètres (1 unité = 100m = 0.1km)
-  const distanceKm = Math.sqrt(dx * dx + dy * dy) * 0.1;
-  
-  // Gisement (Bearing) en degrés
-  let bearingRad = Math.atan2(dx, dy);
-  let bearingDeg = bearingRad * (180 / Math.PI);
-  if (bearingDeg < 0) {
-    bearingDeg += 360;
-  }
-
-  // Mettre à jour l'affichage
-  distanceDisplay.textContent = `${distanceKm.toFixed(2)} km`;
-  bearingDisplay.textContent = `${bearingDeg.toFixed(1)}°`;
-
-  // Mettre à jour l'aiguille de la boussole
-  needle.style.transform = `translate(-50%, -50%) rotate(${bearingDeg}deg)`;
-
-  // Calculer le rayon de la zone d'impact (dispersion en mètres)
+  // Évaluation de la dispersion
   const targetType = ordnanceTypeSel.value;
-  let dispersion = 50;
-  if (targetType === 'surface') {
-    dispersion = 50 + (distanceKm * 10);
-  } else if (targetType === 'bunker') {
-    dispersion = 30 + (distanceKm * 5);
-  } else if (targetType === 'smoke') {
-    dispersion = 80 + (distanceKm * 15);
+  const isSalvo = salvoModeSel.value === 'salvo';
+  const salvoCount = parseInt(salvoCountInput.value) || 5;
+
+  // Pour chaque cible, calculer les solutions
+  const solutionsList = [];
+
+  targets.forEach((targetObj, index) => {
+    const target = getGlobalCoords(targetObj.col, targetObj.row, targetObj.subX, targetObj.subY);
+    const dx = target.x - nest.x;
+    const dy = target.y - nest.y;
+    const distanceKm = Math.sqrt(dx * dx + dy * dy) * 0.1;
+
+    let bearingRad = Math.atan2(dx, dy);
+    let bearingDeg = bearingRad * (180 / Math.PI);
+    if (bearingDeg < 0) bearingDeg += 360;
+
+    let dispersion = 50;
+    if (targetType === 'surface') {
+      dispersion = 50 + (distanceKm * 10);
+    } else if (targetType === 'bunker') {
+      dispersion = 30 + (distanceKm * 5);
+    } else if (targetType === 'smoke') {
+      dispersion = 80 + (distanceKm * 15);
+    }
+
+    solutionsList.push({
+      index,
+      distanceKm,
+      bearingDeg,
+      dispersion,
+      targetObj
+    });
+  });
+
+  // Mettre à jour l'affichage de la cible ACTIVE pour la boussole et le readout principal
+  const activeSol = solutionsList[activeTargetIndex] || solutionsList[0];
+  if (activeSol) {
+    distanceDisplay.textContent = `${activeSol.distanceKm.toFixed(2)} km`;
+    bearingDisplay.textContent = `${activeSol.bearingDeg.toFixed(1)}°`;
+    dispersionDisplay.textContent = `Ø ${Math.round(activeSol.dispersion * 2)}m`;
+    needle.style.transform = `translate(-50%, -50%) rotate(${activeSol.bearingDeg}deg)`;
   }
 
-  // Afficher le diamètre de dispersion
-  dispersionDisplay.textContent = `Ø ${Math.round(dispersion * 2)}m`;
-
-  // Mettre à jour la table des élévations
-  updateElevationTable(distanceKm);
+  // Mettre à jour la table des élévations de toutes les cibles
+  updateElevationTable(solutionsList);
   
   // Recommandation d'obus
   updateOrdnanceRecommendation();
 
-  // Mode Salve
-  const isSalvo = salvoModeSel.value === 'salvo';
-  const salvoCount = parseInt(salvoCountInput.value) || 5;
-
-  // Redessiner la carte avec la zone de dispersion
-  drawMap(nest, target, dispersion, isSalvo, salvoCount);
+  // Redessiner la carte
+  drawMap(nest, solutionsList, isSalvo, salvoCount);
 }
 
-// Mettre à jour la table d'élévation
-function updateElevationTable(distKm) {
+// Mettre à jour la table des élévations (Multi-cibles)
+function updateElevationTable(solutionsList) {
   elevationTableBody.innerHTML = '';
-  const t = translations[currentLang];
   
-  for (let charges = 1; charges <= 6; charges++) {
-    const elevation = (12 / charges) * distKm;
-    let statusClass = 'status-stable';
-    let statusText = t.statExcellent || 'Excellent';
-
-    if (elevation > 85) {
-      statusClass = 'status-danger';
-      statusText = t.statTooClose || 'Too close';
-    } else if (elevation < 3) {
-      statusClass = 'status-warning';
-      statusText = t.statMaxRange || 'Max range exceeded';
-    } else if (elevation > 65) {
-      statusClass = 'status-warning';
-      statusText = t.statHighDispersion || 'High dispersion';
+  solutionsList.forEach((sol) => {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    if (sol.index === activeTargetIndex) {
+      tr.style.backgroundColor = 'rgba(255, 170, 0, 0.05)';
     }
 
-    const labelCharges = charges === 1 ? (t.chargeSingular || 'Charge') : (t.chargePlural || 'Charges');
+    // Calculer les charges d'élévation
+    const solutionsText = [];
+    for (let c = 1; c <= 4; c++) {
+      const elev = (12 / c) * sol.distanceKm;
+      if (elev <= 85 && elev >= 3) {
+        solutionsText.push(`${c}C: ${elev.toFixed(1)}°`);
+      }
+    }
 
-    const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${charges} ${labelCharges}</td>
-      <td class="highlight-amber">${elevation > 85 ? 'N/A' : elevation.toFixed(2) + '°'}</td>
-      <td class="${statusClass}">${statusText}</td>
+      <td class="highlight-text" style="font-weight:bold;">#${sol.index + 1} (${formatCoord(sol.targetObj.col, sol.targetObj.row, sol.targetObj.subX, sol.targetObj.subY)})</td>
+      <td>${sol.distanceKm.toFixed(2)} km</td>
+      <td>${sol.bearingDeg.toFixed(1)}°</td>
+      <td class="highlight-amber">${solutionsText.join(' | ') || 'N/A'}</td>
     `;
+
+    // Cliquer sur une ligne de solution active cette cible
+    tr.addEventListener('click', () => {
+      activeTargetIndex = sol.index;
+      renderTargetFields();
+      calculateBalistics();
+    });
+
     elevationTableBody.appendChild(tr);
-  }
+  });
 }
 
 // Recommandations d'obus
@@ -236,8 +416,8 @@ function updateOrdnanceRecommendation() {
   ordnanceRecommendation.innerHTML = text;
 }
 
-// Dessiner la carte tactique sur le Canvas
-function drawMap(nest, target, dispersion = 0, isSalvo = false, salvoCount = 5) {
+// Dessiner la carte tactique sur le Canvas (Support Multi-cibles)
+function drawMap(nest, solutionsList, isSalvo, salvoCount) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
@@ -247,7 +427,6 @@ function drawMap(nest, target, dispersion = 0, isSalvo = false, salvoCount = 5) 
   ctx.fillStyle = '#050608';
   ctx.fillRect(0, 0, w, h);
 
-  // Dessiner la grille 20x10
   const cellW = w / 20;
   const cellH = h / 10;
 
@@ -279,123 +458,108 @@ function drawMap(nest, target, dispersion = 0, isSalvo = false, salvoCount = 5) 
     ctx.fillText(String(10 - j), 4, j * cellH + cellH - 4);
   }
 
-  // Tracer la ligne de visée
-  if (nest && target) {
-    const nestPixelX = (nest.x / 200) * w;
-    const nestPixelY = h - (nest.y / 100) * h;
+  const nestPixelX = (nest.x / 200) * w;
+  const nestPixelY = h - (nest.y / 100) * h;
+
+  // Dessiner chaque cible
+  solutionsList.forEach((sol) => {
+    const target = getGlobalCoords(sol.targetObj.col, sol.targetObj.row, sol.targetObj.subX, sol.targetObj.subY);
     const targetPixelX = (target.x / 200) * w;
     const targetPixelY = h - (target.y / 100) * h;
 
-    // Ligne pointillée
+    const isActive = sol.index === activeTargetIndex;
+
+    // Ligne de visée pointillée
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255, 170, 0, 0.5)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = isActive ? 'rgba(255, 170, 0, 0.6)' : 'rgba(255, 170, 0, 0.2)';
+    ctx.lineWidth = isActive ? 2 : 1;
     ctx.setLineDash([5, 5]);
     ctx.moveTo(nestPixelX, nestPixelY);
     ctx.lineTo(targetPixelX, targetPixelY);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Dessiner le Nest (Vert)
+    // Dessiner la Cible
     ctx.beginPath();
-    ctx.arc(nestPixelX, nestPixelY, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#39ff14';
+    ctx.arc(targetPixelX, targetPixelY, isActive ? 6 : 5, 0, Math.PI * 2);
+    ctx.fillStyle = isActive ? '#ff3b30' : 'rgba(255, 59, 48, 0.5)';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = isActive ? 1.5 : 1;
     ctx.stroke();
 
-    // Réticule Nest
+    // Réticule
     ctx.beginPath();
-    ctx.moveTo(nestPixelX - 12, nestPixelY);
-    ctx.lineTo(nestPixelX + 12, nestPixelY);
-    ctx.moveTo(nestPixelX, nestPixelY - 12);
-    ctx.lineTo(nestPixelX, nestPixelY + 12);
-    ctx.strokeStyle = '#39ff14';
+    const retSize = isActive ? 14 : 10;
+    ctx.moveTo(targetPixelX - retSize, targetPixelY); ctx.lineTo(targetPixelX + retSize, targetPixelY);
+    ctx.moveTo(targetPixelX, targetPixelY - retSize); ctx.lineTo(targetPixelX, targetPixelY + retSize);
+    ctx.strokeStyle = isActive ? '#ff3b30' : 'rgba(255, 59, 48, 0.5)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Dessiner la Cible (Rouge)
-    ctx.beginPath();
-    ctx.arc(targetPixelX, targetPixelY, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff3b30';
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    // Zone d'impact
+    if (sol.dispersion > 0) {
+      const pixelRadius = (sol.dispersion / 1000) * cellW;
 
-    // Réticule cible
-    ctx.beginPath();
-    ctx.moveTo(targetPixelX - 14, targetPixelY);
-    ctx.lineTo(targetPixelX + 14, targetPixelY);
-    ctx.moveTo(targetPixelX, targetPixelY - 14);
-    ctx.lineTo(targetPixelX, targetPixelY + 14);
-    ctx.strokeStyle = '#ff3b30';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Zone d'impact de dispersion réelle à l'échelle
-    if (dispersion > 0) {
-      const cellW = w / 20; // pixels pour 1000m
-      const pixelRadius = (dispersion / 1000) * cellW;
-
-      // Dessiner la zone d'impact en pointillés
       ctx.beginPath();
       ctx.arc(targetPixelX, targetPixelY, pixelRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255, 59, 48, 0.4)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = isActive ? 'rgba(255, 59, 48, 0.4)' : 'rgba(255, 59, 48, 0.15)';
+      ctx.lineWidth = isActive ? 1.5 : 1;
       ctx.setLineDash([4, 3]);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Remplissage translucide rouge
-      ctx.fillStyle = 'rgba(255, 59, 48, 0.08)';
+      ctx.fillStyle = isActive ? 'rgba(255, 59, 48, 0.08)' : 'rgba(255, 59, 48, 0.02)';
       ctx.fill();
+    }
 
-      // Dessiner les impacts de la Salve si active
-      if (isSalvo) {
-        // Graine déterministe simple basée sur les coordonnées
-        let seed = nest.x + nest.y + target.x + target.y;
-        const seededRandom = () => {
-          const x = Math.sin(seed++) * 10000;
-          return x - Math.floor(x);
-        };
+    // Dessiner la Salve de cette cible
+    if (isSalvo) {
+      let seed = nest.x + nest.y + target.x + target.y;
+      const seededRandom = () => {
+        const x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+      };
 
-        for (let s = 0; s < salvoCount; s++) {
-          const angle = seededRandom() * Math.PI * 2;
-          // Distribution gaussienne simple (moyenne de 2 variables pour avoir plus d'impacts au centre)
-          const distRatio = (seededRandom() + seededRandom()) / 2;
-          const dist = distRatio * dispersion;
+      for (let s = 0; s < salvoCount; s++) {
+        const angle = seededRandom() * Math.PI * 2;
+        const distRatio = (seededRandom() + seededRandom()) / 2;
+        const dist = distRatio * sol.dispersion;
 
-          // Décalage en mètres
-          const dxMeters = Math.cos(angle) * dist;
-          const dyMeters = Math.sin(angle) * dist;
+        const dxMeters = Math.cos(angle) * dist;
+        const dyMeters = Math.sin(angle) * dist;
 
-          // Conversion en pixels
-          const cellW = w / 20;
-          const impactPixelX = targetPixelX + (dxMeters / 1000) * cellW;
-          const impactPixelY = targetPixelY - (dyMeters / 1000) * cellW;
+        const impactPixelX = targetPixelX + (dxMeters / 1000) * cellW;
+        const impactPixelY = targetPixelY - (dyMeters / 1000) * cellW;
 
-          // Dessiner le point d'impact
-          ctx.beginPath();
-          ctx.arc(impactPixelX, impactPixelY, 3, 0, Math.PI * 2);
-          ctx.fillStyle = s === 0 ? 'rgba(255, 170, 0, 0.9)' : 'rgba(255, 59, 48, 0.8)'; // Couleur distincte pour le premier obus
-          ctx.fill();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-
-          // Petit réticule d'impact
-          ctx.beginPath();
-          ctx.moveTo(impactPixelX - 4, impactPixelY); ctx.lineTo(impactPixelX + 4, impactPixelY);
-          ctx.moveTo(impactPixelX, impactPixelY - 4); ctx.lineTo(impactPixelX, impactPixelY + 4);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-        }
+        ctx.beginPath();
+        ctx.arc(impactPixelX, impactPixelY, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = s === 0 ? 'rgba(255, 170, 0, 0.8)' : 'rgba(255, 59, 48, 0.6)';
+        ctx.fill();
       }
     }
-  }
+    
+    // Numéro de la cible
+    ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.6)';
+    ctx.font = 'bold 9px Arial';
+    ctx.fillText(`#${sol.index + 1}`, targetPixelX + 8, targetPixelY - 8);
+  });
+
+  // Dessiner le Nest (toujours au premier plan)
+  ctx.beginPath();
+  ctx.arc(nestPixelX, nestPixelY, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#39ff14';
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(nestPixelX - 12, nestPixelY); ctx.lineTo(nestPixelX + 12, nestPixelY);
+  ctx.moveTo(nestPixelX, nestPixelY - 12); ctx.lineTo(nestPixelX, nestPixelY + 12);
+  ctx.strokeStyle = '#39ff14';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 }
 
 // Gérer le survol et le clic sur la carte
@@ -407,11 +571,11 @@ function handleMapInteraction(e) {
   const y = (e.clientY - rect.top) * scaleY;
   const t = translations[currentLang];
 
-  // Calculer la case de la grille
+  // Case de la grille
   const colIndex = Math.floor(x / (canvas.width / 20));
   const rowIndex = 10 - Math.floor(y / (canvas.height / 10));
 
-  // Calculer la coordonnée fine
+  // Coordonnée fine
   const cellW = canvas.width / 20;
   const cellH = canvas.height / 10;
   const relativeX = x % cellW;
@@ -434,10 +598,14 @@ function handleMapInteraction(e) {
       nestSubXInput.value = finalSubX;
       nestSubYInput.value = finalSubY;
     } else {
-      targetColSel.value = finalCol;
-      targetRowSel.value = finalRow;
-      targetSubXInput.value = finalSubX;
-      targetSubYInput.value = finalSubY;
+      // Déplacer la cible ACTIVE
+      if (targets[activeTargetIndex]) {
+        targets[activeTargetIndex].col = finalCol;
+        targets[activeTargetIndex].row = finalRow;
+        targets[activeTargetIndex].subX = finalSubX;
+        targets[activeTargetIndex].subY = finalSubY;
+        renderTargetFields();
+      }
     }
     calculateBalistics();
   }
@@ -463,24 +631,31 @@ mapModeTargetBtn.addEventListener('click', () => {
   mapModeNestBtn.classList.remove('active');
 });
 
-// Écouteurs de changement pour les contrôles de formulaire
-[nestColSel, nestRowSel, nestSubXInput, nestSubYInput,
- targetColSel, targetRowSel, targetSubXInput, targetSubYInput, 
- ordnanceTypeSel, salvoModeSel, salvoCountInput].forEach(elem => {
+// Écouteurs de changement pour les contrôles de formulaire statiques
+[nestColSel, nestRowSel, nestSubXInput, nestSubYInput, ordnanceTypeSel, salvoModeSel, salvoCountInput].forEach(elem => {
   elem.addEventListener('input', calculateBalistics);
 });
 
-// Écouteur spécifique pour le mode Salve
+// Écouteur spécifique pour le mode Salve (affiche/cache le bouton + Cible)
 salvoModeSel.addEventListener('change', () => {
   if (salvoModeSel.value === 'salvo') {
     salvoCountField.style.visibility = 'visible';
     salvoCountField.style.opacity = '1';
+    btnAddTarget.style.display = 'inline-block';
   } else {
     salvoCountField.style.visibility = 'hidden';
     salvoCountField.style.opacity = '0';
+    btnAddTarget.style.display = 'none';
+    // Repasser à une cible unique
+    targets = [targets[0]];
+    activeTargetIndex = 0;
+    renderTargetFields();
   }
   calculateBalistics();
 });
+
+// Bouton d'ajout de cible
+btnAddTarget.addEventListener('click', addTarget);
 
 // Gérer le bouton Reset
 btnReset.addEventListener('click', () => {
@@ -489,11 +664,15 @@ btnReset.addEventListener('click', () => {
   nestSubXInput.value = 0;
   nestSubYInput.value = 0;
 
-  targetColSel.value = 11;
-  targetRowSel.value = 6;
-  targetSubXInput.value = 0;
-  targetSubYInput.value = 0;
+  salvoModeSel.value = 'single';
+  salvoCountField.style.visibility = 'hidden';
+  salvoCountField.style.opacity = '0';
+  btnAddTarget.style.display = 'none';
 
+  targets = [{ col: 11, row: 6, subX: 0, subY: 0 }];
+  activeTargetIndex = 0;
+
+  renderTargetFields();
   calculateBalistics();
 });
 
@@ -537,42 +716,52 @@ btnSave.addEventListener('click', async () => {
   const nestSubX = parseInt(nestSubXInput.value) || 0;
   const nestSubY = parseInt(nestSubYInput.value) || 0;
 
-  const targetCol = parseInt(targetColSel.value);
-  const targetRow = parseInt(targetRowSel.value);
-  const targetSubX = parseInt(targetSubXInput.value) || 0;
-  const targetSubY = parseInt(targetSubYInput.value) || 0;
-
   const nest = getGlobalCoords(nestCol, nestRow, nestSubX, nestSubY);
-  const target = getGlobalCoords(targetCol, targetRow, targetSubX, targetSubY);
-
-  const dx = target.x - nest.x;
-  const dy = target.y - nest.y;
-  const distanceKm = Math.sqrt(dx * dx + dy * dy) * 0.1;
   
-  let bearingRad = Math.atan2(dx, dy);
-  let bearingDeg = bearingRad * (180 / Math.PI);
-  if (bearingDeg < 0) bearingDeg += 360;
+  // Compiler les infos de toutes les cibles
+  const targetsStrList = [];
+  let totalDistance = 0;
+  let totalBearing = 0;
 
-  // Calculer les solutions d'élévation
-  const solutions = [];
+  targets.forEach(tObj => {
+    targetsStrList.push(formatCoord(tObj.col, tObj.row, tObj.subX, tObj.subY));
+    const tG = getGlobalCoords(tObj.col, tObj.row, tObj.subX, tObj.subY);
+    const dx = tG.x - nest.x;
+    const dy = tG.y - nest.y;
+    totalDistance += Math.sqrt(dx * dx + dy * dy) * 0.1;
+    let b = Math.atan2(dx, dy) * (180 / Math.PI);
+    if (b < 0) b += 360;
+    totalBearing += b;
+  });
+
+  const avgDistance = totalDistance / targets.length;
+  const avgBearing = totalBearing / targets.length;
+
+  const targetStr = targetsStrList.join(' | ');
+
+  // Solutions récapitulatives
+  const solutionsTextList = [];
   for (let c = 1; c <= 4; c++) {
-    const elev = (12 / c) * distanceKm;
+    const elev = (12 / c) * avgDistance;
     if (elev <= 85 && elev >= 3) {
-      solutions.push(`${c}C: ${elev.toFixed(1)}°`);
+      solutionsTextList.push(`${c}C: ${elev.toFixed(1)}°`);
     }
   }
+  const solutionsStr = solutionsTextList.join(' | ') || 'Hors limite';
 
-  const solutionsStr = solutions.join(' | ') || 'Hors limite';
-  
   const isSalvo = salvoModeSel.value === 'salvo';
   const salvoCount = parseInt(salvoCountInput.value) || 5;
   const munitionBase = ordnanceTypeSel.value.toUpperCase();
-  const munitionStr = isSalvo ? `${munitionBase} (SALVE x${salvoCount})` : munitionBase;
+  // Mentionner si c'est une salve multi-cibles
+  const munitionStr = isSalvo 
+    ? `${munitionBase} (SALVE x${salvoCount} / ${targets.length} CIBLES)` 
+    : munitionBase;
 
   const rawData = {
     nestCol, nestRow, nestSubX, nestSubY,
-    targetCol, targetRow, targetSubX, targetSubY,
-    isSalvo, salvoCount
+    targets,
+    isSalvo,
+    salvoCount
   };
 
   if (supabase) {
@@ -581,9 +770,9 @@ btnSave.addEventListener('click', async () => {
         .from('missions')
         .insert([{
           nest_coord: formatCoord(nestCol, nestRow, nestSubX, nestSubY),
-          target_coord: formatCoord(targetCol, targetRow, targetSubX, targetSubY),
-          distance: distanceKm,
-          bearing: bearingDeg,
+          target_coord: targetStr,
+          distance: avgDistance,
+          bearing: avgBearing,
           solutions: solutionsStr,
           munition: munitionStr,
           raw_data: rawData
@@ -591,25 +780,24 @@ btnSave.addEventListener('click', async () => {
 
       if (error) throw error;
     } catch (err) {
-      console.error('Supabase: Échec de sauvegarde de la cible.', err);
-      // Fallback local en cas d'erreur
-      saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetCol, targetRow, targetSubX, targetSubY, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData);
+      console.error('Supabase: Échec de sauvegarde.', err);
+      saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetStr, avgDistance, avgBearing, solutionsStr, munitionStr, rawData);
     }
   } else {
-    saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetCol, targetRow, targetSubX, targetSubY, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData);
+    saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetStr, avgDistance, avgBearing, solutionsStr, munitionStr, rawData);
   }
 
   await loadHistory();
 });
 
 // Helper de sauvegarde locale
-function saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetCol, targetRow, targetSubX, targetSubY, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData) {
+function saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetStr, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData) {
   const localHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
   const newRecord = {
     id: Date.now(),
     date: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
     nest: formatCoord(nestCol, nestRow, nestSubX, nestSubY),
-    target: formatCoord(targetCol, targetRow, targetSubX, targetSubY),
+    target: targetStr,
     distance: `${distanceKm.toFixed(2)} km`,
     bearing: `${bearingDeg.toFixed(1)}°`,
     solutions: solutionsStr,
@@ -630,22 +818,34 @@ window.loadRecord = function(id) {
     nestSubXInput.value = record.raw.nestSubX;
     nestSubYInput.value = record.raw.nestSubY;
 
-    targetColSel.value = record.raw.targetCol;
-    targetRowSel.value = record.raw.targetRow;
-    targetSubXInput.value = record.raw.targetSubX;
-    targetSubYInput.value = record.raw.targetSubY;
+    if (record.raw.targets) {
+      targets = JSON.parse(JSON.stringify(record.raw.targets));
+    } else if (record.raw.targetCol !== undefined) {
+      // Compatibilité ancienne version
+      targets = [{
+        col: record.raw.targetCol,
+        row: record.raw.targetRow,
+        subX: record.raw.targetSubX,
+        subY: record.raw.targetSubY
+      }];
+    }
+
+    activeTargetIndex = 0;
 
     if (record.raw.isSalvo) {
       salvoModeSel.value = 'salvo';
       salvoCountInput.value = record.raw.salvoCount;
       salvoCountField.style.visibility = 'visible';
       salvoCountField.style.opacity = '1';
+      btnAddTarget.style.display = 'inline-block';
     } else {
       salvoModeSel.value = 'single';
       salvoCountField.style.visibility = 'hidden';
       salvoCountField.style.opacity = '0';
+      btnAddTarget.style.display = 'none';
     }
 
+    renderTargetFields();
     calculateBalistics();
   }
 };
@@ -653,7 +853,6 @@ window.loadRecord = function(id) {
 // Supprimer un enregistrement historique
 window.deleteRecord = async function(id) {
   if (supabase && typeof id === 'string') {
-    // Les UUID Supabase sont des chaînes, le Date.now() local est un number
     try {
       const { error } = await supabase
         .from('missions')
@@ -665,7 +864,6 @@ window.deleteRecord = async function(id) {
       console.error('Supabase: Échec de suppression.', err);
     }
   } else {
-    // Suppression locale
     let localHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
     localHistory = localHistory.filter(r => r.id !== id);
     localStorage.setItem('ironnest_history', JSON.stringify(localHistory));
@@ -687,7 +885,7 @@ function renderHistory() {
     tr.innerHTML = `
       <td>${record.date}</td>
       <td class="highlight-text">${record.nest}</td>
-      <td class="status-danger" style="font-weight: bold;">${record.target}</td>
+      <td class="status-danger" style="font-weight: bold; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${record.target}">${record.target}</td>
       <td>${record.distance}</td>
       <td>${record.bearing}</td>
       <td class="highlight">${record.solutions}</td>
