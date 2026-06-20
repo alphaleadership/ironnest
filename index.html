@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Calculateur balistique et carte interactive pour le simulateur d'artillerie dieselpunk Iron Nest. Calculez instantanément la distance, l'azimut (bearing) et l'élévation nécessaire pour vos obus." />
+    <title>Iron Nest - Calculateur de Tir d'Artillerie Balistique</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <!-- Google Fonts: Share Tech Mono & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app" class="dieselpunk-console">
+      <header class="console-header">
+        <div class="header-leds">
+          <span class="led green blinking" id="led-status"></span>
+          <span class="led amber" id="led-calc"></span>
+        </div>
+        <h1 class="console-title">IRON NEST // CALCULATEUR BALISTIQUE</h1>
+        <div class="system-time" id="sys-time">SYS.TIME: 07:25:28</div>
+      </header>
+
+      <main class="console-body">
+        <!-- Section gauche : Paramètres et Entrées -->
+        <section class="control-panel panel-left" aria-labelledby="input-heading">
+          <div class="panel-header">
+            <h2 id="input-heading">COORDONNÉES DE TIR</h2>
+          </div>
+          
+          <div class="panel-content">
+            <!-- Position Iron Nest -->
+            <fieldset class="coord-group" id="nest-coords-group">
+              <legend>POSITION DE L'IRON NEST</legend>
+              <div class="inputs-row">
+                <div class="input-field">
+                  <label for="nest-col">COL (A-T)</label>
+                  <select id="nest-col" class="custom-select">
+                    <option value="0">A</option><option value="1">B</option><option value="2">C</option>
+                    <option value="3">D</option><option value="4">E</option><option value="5">F</option>
+                    <option value="6">G</option><option value="7">H</option><option value="8">I</option>
+                    <option value="9">J</option><option value="10" selected>K</option><option value="11">L</option>
+                    <option value="12">M</option><option value="13">N</option><option value="14">O</option>
+                    <option value="15">P</option><option value="16">Q</option><option value="17">R</option>
+                    <option value="18">S</option><option value="19">T</option>
+                  </select>
+                </div>
+                
+                <div class="input-field">
+                  <label for="nest-row">LIGNE (1-10)</label>
+                  <select id="nest-row" class="custom-select">
+                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                    <option value="4">4</option><option value="5" selected>5</option><option value="6">6</option>
+                    <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                    <option value="10">10</option>
+                  </select>
+                </div>
+
+                <div class="input-field">
+                  <label for="nest-sub-x">SUB X (0-9)</label>
+                  <input type="number" id="nest-sub-x" min="0" max="9" value="0" class="custom-input">
+                </div>
+
+                <div class="input-field">
+                  <label for="nest-sub-y">SUB Y (0-9)</label>
+                  <input type="number" id="nest-sub-y" min="0" max="9" value="0" class="custom-input">
+                </div>
+              </div>
+              <div class="computed-label">GLOBAL: <span id="nest-global-display" class="highlight">K5 0:0</span></div>
+            </fieldset>
+
+            <!-- Position Target -->
+            <fieldset class="coord-group" id="target-coords-group">
+              <legend>POSITION DE LA CIBLE</legend>
+              <div class="inputs-row">
+                <div class="input-field">
+                  <label for="target-col">COL (A-T)</label>
+                  <select id="target-col" class="custom-select">
+                    <option value="0">A</option><option value="1">B</option><option value="2">C</option>
+                    <option value="3">D</option><option value="4">E</option><option value="5">F</option>
+                    <option value="6">G</option><option value="7">H</option><option value="8">I</option>
+                    <option value="9">J</option><option value="10">K</option><option value="11" selected>L</option>
+                    <option value="12">M</option><option value="13">N</option><option value="14">O</option>
+                    <option value="15">P</option><option value="16">Q</option><option value="17">R</option>
+                    <option value="18">S</option><option value="19">T</option>
+                  </select>
+                </div>
+                
+                <div class="input-field">
+                  <label for="target-row">LIGNE (1-10)</label>
+                  <select id="target-row" class="custom-select">
+                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                    <option value="4">4</option><option value="5">5</option><option value="6" selected>6</option>
+                    <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                    <option value="10">10</option>
+                  </select>
+                </div>
+
+                <div class="input-field">
+                  <label for="target-sub-x">SUB X (0-9)</label>
+                  <input type="number" id="target-sub-x" min="0" max="9" value="0" class="custom-input">
+                </div>
+
+                <div class="input-field">
+                  <label for="target-sub-y">SUB Y (0-9)</label>
+                  <input type="number" id="target-sub-y" min="0" max="9" value="0" class="custom-input">
+                </div>
+              </div>
+              <div class="computed-label">GLOBAL: <span id="target-global-display" class="highlight">L6 0:0</span></div>
+            </fieldset>
+
+            <!-- Type d'obus -->
+            <div class="ordnance-selection card-bg">
+              <h3>MUNITIONS & PORTÉE</h3>
+              <div class="inputs-row">
+                <div class="input-field full-width">
+                  <label for="ordnance-type">TYPE DE CIBLE / IMPACT</label>
+                  <select id="ordnance-type" class="custom-select">
+                    <option value="surface">Blindé / Infanterie en Surface (Recommande HE)</option>
+                    <option value="bunker">Bunker / Fortification Blindée (Recommande AP)</option>
+                    <option value="smoke">Écran Tactique (Recommande FUMIGÈNE)</option>
+                  </select>
+                </div>
+              </div>
+              <div id="ordnance-recommendation" class="rec-box">
+                Recommandation : <span class="highlight-text">HE (High Explosive)</span>
+              </div>
+            </div>
+
+            <!-- Boutons -->
+            <div class="buttons-grid">
+              <button id="btn-reset" class="btn btn-danger">RÉINITIALISER</button>
+              <button id="btn-save" class="btn btn-success">ENREGISTRER LA CIBLE</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section centrale : Carte interactive -->
+        <section class="control-panel panel-center" aria-labelledby="map-heading">
+          <div class="panel-header">
+            <h2 id="map-heading">CARTE DES OPÉRATIONS (20x10)</h2>
+            <div class="map-controls">
+              <button id="map-mode-nest" class="btn btn-small active">Placer Nest</button>
+              <button id="map-mode-target" class="btn btn-small">Placer Cible</button>
+            </div>
+          </div>
+          <div class="panel-content map-wrapper">
+            <canvas id="tactical-map" width="800" height="400"></canvas>
+            <div class="map-legend">
+              <span class="legend-item"><span class="marker nest"></span> Iron Nest</span>
+              <span class="legend-item"><span class="marker target"></span> Cible</span>
+              <span class="legend-display" id="coord-under-cursor">Curseur: --</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section droite : Résultats balistiques -->
+        <section class="control-panel panel-right" aria-labelledby="results-heading">
+          <div class="panel-header">
+            <h2 id="results-heading">SOLUTIONS BALISTIQUES</h2>
+          </div>
+          <div class="panel-content balistics-layout">
+            <!-- Boussole -->
+            <div class="compass-container card-bg">
+              <h3>BOUSSOLE DE GISEMENT</h3>
+              <div class="compass-wrapper">
+                <div class="compass-ring" id="compass-ring">
+                  <div class="compass-card">
+                    <span class="compass-dir north">N</span>
+                    <span class="compass-dir east">E</span>
+                    <span class="compass-dir south">S</span>
+                    <span class="compass-dir west">W</span>
+                  </div>
+                  <div class="compass-needle" id="compass-needle"></div>
+                  <div class="compass-indicator" id="compass-target-indicator"></div>
+                </div>
+              </div>
+              <div class="compass-readout">
+                <div class="readout-box">
+                  <span class="readout-label">GISEMENT (BEARING)</span>
+                  <span class="readout-value highlight-amber" id="bearing-value">045.0°</span>
+                </div>
+                <div class="readout-box">
+                  <span class="readout-label">DISTANCE (RANGE)</span>
+                  <span class="readout-value highlight-amber" id="distance-value">1.41 km</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table d'élévation -->
+            <div class="elevation-table-wrapper card-bg">
+              <h3>TABLE DES ÉLÉVATIONS REQUISES</h3>
+              <table class="elevation-table" id="elevation-table">
+                <thead>
+                  <tr>
+                    <th>CHARGES</th>
+                    <th>ÉLÉVATION (DEG)</th>
+                    <th>STABILITÉ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Généré en JS -->
+                </tbody>
+              </table>
+              <div class="table-disclaimer">
+                * Calcul basé sur : <code>Élévation = (12 / Charges) * Distance (km)</code>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Historique des cibles enregistrées -->
+      <footer class="console-footer">
+        <section class="history-panel" aria-labelledby="history-heading">
+          <h2 id="history-heading">JOURNAL DES MISSIONS & CIBLES ENREGISTRÉES</h2>
+          <div class="table-scroll-container">
+            <table class="history-table" id="history-table">
+              <thead>
+                <tr>
+                  <th>DATE/HEURE</th>
+                  <th>NEST</th>
+                  <th>CIBLE</th>
+                  <th>DISTANCE</th>
+                  <th>GISEMENT</th>
+                  <th>SOLUTIONS (Charges / Élev.)</th>
+                  <th>MUNITION</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="history-body">
+                <!-- Rempli en JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
