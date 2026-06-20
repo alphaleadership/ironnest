@@ -23,6 +23,7 @@ const ordnanceRecommendation = document.getElementById('ordnance-recommendation'
 
 const bearingDisplay = document.getElementById('bearing-value');
 const distanceDisplay = document.getElementById('distance-value');
+const dispersionDisplay = document.getElementById('dispersion-value');
 const elevationTableBody = document.querySelector('#elevation-table tbody');
 
 const needle = document.getElementById('compass-needle');
@@ -155,14 +156,28 @@ function calculateBalistics() {
   // Mettre à jour l'aiguille de la boussole
   needle.style.transform = `translate(-50%, -50%) rotate(${bearingDeg}deg)`;
 
+  // Calculer le rayon de la zone d'impact (dispersion en mètres)
+  const targetType = ordnanceTypeSel.value;
+  let dispersion = 50;
+  if (targetType === 'surface') {
+    dispersion = 50 + (distanceKm * 10);
+  } else if (targetType === 'bunker') {
+    dispersion = 30 + (distanceKm * 5);
+  } else if (targetType === 'smoke') {
+    dispersion = 80 + (distanceKm * 15);
+  }
+
+  // Afficher le diamètre de dispersion
+  dispersionDisplay.textContent = `Ø ${Math.round(dispersion * 2)}m`;
+
   // Mettre à jour la table des élévations
   updateElevationTable(distanceKm);
   
   // Recommandation d'obus
   updateOrdnanceRecommendation();
 
-  // Redessiner la carte
-  drawMap(nest, target);
+  // Redessiner la carte avec la zone de dispersion
+  drawMap(nest, target, dispersion);
 }
 
 // Mettre à jour la table d'élévation
@@ -214,7 +229,7 @@ function updateOrdnanceRecommendation() {
 }
 
 // Dessiner la carte tactique sur le Canvas
-function drawMap(nest, target) {
+function drawMap(nest, target, dispersion = 0) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
@@ -311,11 +326,24 @@ function drawMap(nest, target) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Cercle d'aide de portée autour de la cible
-    ctx.beginPath();
-    ctx.arc(targetPixelX, targetPixelY, 15, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 59, 48, 0.4)';
-    ctx.stroke();
+    // Zone d'impact de dispersion réelle à l'échelle
+    if (dispersion > 0) {
+      const cellW = w / 20; // pixels pour 1000m
+      const pixelRadius = (dispersion / 1000) * cellW;
+
+      // Dessiner la zone d'impact en pointillés
+      ctx.beginPath();
+      ctx.arc(targetPixelX, targetPixelY, pixelRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 59, 48, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Remplissage translucide rouge
+      ctx.fillStyle = 'rgba(255, 59, 48, 0.08)';
+      ctx.fill();
+    }
   }
 }
 
