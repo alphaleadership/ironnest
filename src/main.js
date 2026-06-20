@@ -1048,10 +1048,120 @@ btnLangEn.addEventListener('click', () => {
   applyLanguage();
 });
 
+// ---- MOTEUR DE SUCCÈS (ACHIEVEMENTS) ----
+const achievementsList = [
+  { id: 'first_ping', fr: { title: "PREMIER CONTACT", desc: "Placer le Nid et la cible sur la carte" }, en: { title: "FIRST CONTACT", desc: "Place the Nest and Target on the map" }, icon: "📡" },
+  { id: 'first_save', fr: { title: "ARTILLEUR INITIÉ", desc: "Enregistrer son premier tir d'artillerie" }, en: { title: "INITIATED GUNNER", desc: "Save your first artillery shot" }, icon: "🎖️" },
+  { id: 'salvo', fr: { title: "PILONNAGE DE ZONE", desc: "Lancer un tir en mode Salve" }, en: { title: "AREA POUNDING", desc: "Fire in Salvo Mode" }, icon: "💣" },
+  { id: 'salvo_ten', fr: { title: "FEU DE L'ENFER", desc: "Lancer une salve géante de 10 obus" }, en: { title: "HELLFIRE", desc: "Fire a giant 10-shell salvo" }, icon: "🔥" },
+  { id: 'database', fr: { title: "LIEN SÉCURISÉ", desc: "Se connecter à la base Supabase" }, en: { title: "SECURED LINK", desc: "Establish Supabase connection" }, icon: "🛢️" },
+  { id: 'steam', fr: { title: "MATRICULE MILITAIRE", desc: "Lier son compte Steam officiel" }, en: { title: "MILITARY ID", desc: "Link your official Steam account" }, icon: "🎮" },
+  { id: 'veteran', fr: { title: "VÉTÉRAN DU NID", desc: "Enregistrer 10 tirs de coordonnées" }, en: { title: "NEST VETERAN", desc: "Log 10 coordinate shots" }, icon: "🏆" }
+];
+
+function renderAchievements() {
+  const grid = document.getElementById('achievements-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  const unlocked = JSON.parse(localStorage.getItem('ironnest_achievements') || '{}');
+  
+  achievementsList.forEach(ach => {
+    const isUnlocked = !!unlocked[ach.id];
+    const texts = ach[currentLang] || ach['fr'];
+    
+    const card = document.createElement('div');
+    card.className = `achievement-card ${isUnlocked ? 'unlocked' : ''}`;
+    
+    const medal = document.createElement('div');
+    medal.className = 'achievement-medal';
+    medal.textContent = ach.icon;
+    
+    const info = document.createElement('div');
+    info.className = 'achievement-info';
+    
+    const title = document.createElement('span');
+    title.className = 'achievement-title';
+    title.textContent = texts.title;
+    
+    const desc = document.createElement('span');
+    desc.className = 'achievement-desc';
+    desc.textContent = texts.desc;
+    
+    info.appendChild(title);
+    info.appendChild(desc);
+    card.appendChild(medal);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+}
+
+function checkAchievements() {
+  const unlocked = JSON.parse(localStorage.getItem('ironnest_achievements') || '{}');
+  let changed = false;
+  
+  // 1. First Ping
+  if (!unlocked['first_ping']) {
+    unlocked['first_ping'] = true;
+    changed = true;
+  }
+  
+  // 2. Steam ID
+  if (currentSteamId && !unlocked['steam']) {
+    unlocked['steam'] = true;
+    changed = true;
+  }
+  
+  // 3. Database
+  if (supabase && !unlocked['database']) {
+    unlocked['database'] = true;
+    changed = true;
+  }
+  
+  // 4. First Save
+  if (targetHistory.length >= 1 && !unlocked['first_save']) {
+    unlocked['first_save'] = true;
+    changed = true;
+  }
+  
+  // 5. Veteran
+  if (targetHistory.length >= 10 && !unlocked['veteran']) {
+    unlocked['veteran'] = true;
+    changed = true;
+  }
+  
+  // 6. Salvo
+  const hasSalvo = targetHistory.some(r => r.munition && r.munition.includes('SALVE'));
+  if (hasSalvo && !unlocked['salvo']) {
+    unlocked['salvo'] = true;
+    changed = true;
+  }
+  
+  // 7. Salvo 10
+  const hasSalvoTen = targetHistory.some(r => r.munition && r.munition.includes('SALVE x10'));
+  if (hasSalvoTen && !unlocked['salvo_ten']) {
+    unlocked['salvo_ten'] = true;
+    changed = true;
+  }
+  
+  if (changed || Object.keys(unlocked).length === 0) {
+    localStorage.setItem('ironnest_achievements', JSON.stringify(unlocked));
+  }
+  renderAchievements();
+}
+
+// Relier checkAchievements après chargement de l'historique
+const originalLoadHistory = loadHistory;
+loadHistory = async function() {
+  await originalLoadHistory();
+  checkAchievements();
+};
+
 // Initialisation générale au démarrage
 async function init() {
   await checkSteamOpenIDCallback();
   applyLanguage();
+  checkAchievements();
 }
 
 init();
