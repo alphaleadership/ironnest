@@ -1,5 +1,6 @@
 import './style.css';
 import { translations } from './i18n.js';
+import { supabase } from './supabase.js';
 
 // Gestion de la langue (i18n)
 let currentLang = localStorage.getItem('ironnest_lang') || 'fr';
@@ -36,6 +37,7 @@ const mapModeNestBtn = document.getElementById('map-mode-nest');
 const mapModeTargetBtn = document.getElementById('map-mode-target');
 
 const sysTimeDisplay = document.getElementById('sys-time');
+const dbStatusBadge = document.getElementById('db-status-badge');
 
 // Langue boutons
 const btnLangFr = document.getElementById('lang-fr');
@@ -45,8 +47,19 @@ const btnLangEn = document.getElementById('lang-en');
 const COLUMNS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
 let mapMode = 'nest'; // 'nest' ou 'target'
 
-// Charger l'historique initial
-let targetHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+// Historique des cibles
+let targetHistory = [];
+
+// Mettre à jour le badge du stockage de données
+function updateDbBadge() {
+  if (supabase) {
+    dbStatusBadge.textContent = currentLang === 'fr' ? 'SUPABASE (EN LIGNE)' : 'SUPABASE (ONLINE)';
+    dbStatusBadge.className = 'db-status-badge supabase';
+  } else {
+    dbStatusBadge.textContent = currentLang === 'fr' ? 'LOCALSTORAGE (HORS LIGNE)' : 'LOCALSTORAGE (OFFLINE)';
+    dbStatusBadge.className = 'db-status-badge local';
+  }
+}
 
 // Fonction d'application de la langue
 function applyLanguage() {
@@ -57,7 +70,6 @@ function applyLanguage() {
     const key = el.getAttribute('data-i18n');
     if (t[key]) {
       if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-        // Pour les options de select
         if (el.placeholder) el.placeholder = t[key];
       } else {
         el.innerHTML = t[key];
@@ -76,9 +88,9 @@ function applyLanguage() {
     document.documentElement.lang = 'en';
   }
 
-  // Recalculer les textes dynamiques
+  updateDbBadge();
   calculateBalistics();
-  renderHistory();
+  loadHistory();
 }
 
 // Mettre à jour l'horloge système
@@ -128,8 +140,7 @@ function calculateBalistics() {
 
   // Distance en kilomètres (1 unité = 100m = 0.1km)
   const distanceKm = Math.sqrt(dx * dx + dy * dy) * 0.1;
-  const distanceMeters = Math.round(distanceKm * 1000);
-
+  
   // Gisement (Bearing) en degrés
   let bearingRad = Math.atan2(dx, dy);
   let bearingDeg = bearingRad * (180 / Math.PI);
@@ -208,7 +219,6 @@ function drawMap(nest, target) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
-  const t = translations[currentLang];
 
   // Effacer
   ctx.fillStyle = '#050608';
@@ -395,8 +405,41 @@ btnReset.addEventListener('click', () => {
   calculateBalistics();
 });
 
-// Enregistrer la cible dans l'historique
-btnSave.addEventListener('click', () => {
+// Charger l'historique
+async function loadHistory() {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('missions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+
+      targetHistory = data.map(item => ({
+        id: item.id,
+        date: new Date(item.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
+        nest: item.nest_coord,
+        target: item.target_coord,
+        distance: `${parseFloat(item.distance).toFixed(2)} km`,
+        bearing: `${parseFloat(item.bearing).toFixed(1)}°`,
+        solutions: item.solutions,
+        munition: item.munition,
+        raw: item.raw_data
+      }));
+    } catch (err) {
+      console.error('Supabase: Échec de chargement des cibles, repli sur localStorage.', err);
+      targetHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+    }
+  } else {
+    targetHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+  }
+  renderHistory();
+}
+
+// Enregistrer la cible
+btnSave.addEventListener('click', async () => {
   const nestCol = parseInt(nestColSel.value);
   const nestRow = parseInt(nestRowSel.value);
   const nestSubX = parseInt(nestSubXInput.value) || 0;
@@ -427,6 +470,43 @@ btnSave.addEventListener('click', () => {
     }
   }
 
+  const solutionsStr = solutions.join(' | ') || 'Hors limite';
+  const munitionStr = ordnanceTypeSel.value.toUpperCase();
+  const rawData = {
+    nestCol, nestRow, nestSubX, nestSubY,
+    targetCol, targetRow, targetSubX, targetSubY
+  };
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('missions')
+        .insert([{
+          nest_coord: formatCoord(nestCol, nestRow, nestSubX, nestSubY),
+          target_coord: formatCoord(targetCol, targetRow, targetSubX, targetSubY),
+          distance: distanceKm,
+          bearing: bearingDeg,
+          solutions: solutionsStr,
+          munition: munitionStr,
+          raw_data: rawData
+        }]);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Supabase: Échec de sauvegarde de la cible.', err);
+      // Fallback local en cas d'erreur
+      saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetCol, targetRow, targetSubX, targetSubY, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData);
+    }
+  } else {
+    saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetCol, targetRow, targetSubX, targetSubY, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData);
+  }
+
+  await loadHistory();
+});
+
+// Helper de sauvegarde locale
+function saveLocalRecord(nestCol, nestRow, nestSubX, nestSubY, targetCol, targetRow, targetSubX, targetSubY, distanceKm, bearingDeg, solutionsStr, munitionStr, rawData) {
+  const localHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
   const newRecord = {
     id: Date.now(),
     date: new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
@@ -434,19 +514,14 @@ btnSave.addEventListener('click', () => {
     target: formatCoord(targetCol, targetRow, targetSubX, targetSubY),
     distance: `${distanceKm.toFixed(2)} km`,
     bearing: `${bearingDeg.toFixed(1)}°`,
-    solutions: solutions.join(' | ') || 'Hors limite',
-    munition: ordnanceTypeSel.value.toUpperCase(),
-    raw: {
-      nestCol, nestRow, nestSubX, nestSubY,
-      targetCol, targetRow, targetSubX, targetSubY
-    }
+    solutions: solutionsStr,
+    munition: munitionStr,
+    raw: rawData
   };
-
-  targetHistory.unshift(newRecord);
-  if (targetHistory.length > 20) targetHistory.pop();
-  localStorage.setItem('ironnest_history', JSON.stringify(targetHistory));
-  renderHistory();
-});
+  localHistory.unshift(newRecord);
+  if (localHistory.length > 20) localHistory.pop();
+  localStorage.setItem('ironnest_history', JSON.stringify(localHistory));
+}
 
 // Charger un enregistrement historique
 window.loadRecord = function(id) {
@@ -467,10 +542,26 @@ window.loadRecord = function(id) {
 };
 
 // Supprimer un enregistrement historique
-window.deleteRecord = function(id) {
-  targetHistory = targetHistory.filter(r => r.id !== id);
-  localStorage.setItem('ironnest_history', JSON.stringify(targetHistory));
-  renderHistory();
+window.deleteRecord = async function(id) {
+  if (supabase && typeof id === 'string') {
+    // Les UUID Supabase sont des chaînes, le Date.now() local est un number
+    try {
+      const { error } = await supabase
+        .from('missions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error('Supabase: Échec de suppression.', err);
+    }
+  } else {
+    // Suppression locale
+    let localHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
+    localHistory = localHistory.filter(r => r.id !== id);
+    localStorage.setItem('ironnest_history', JSON.stringify(localHistory));
+  }
+  await loadHistory();
 };
 
 // Rendre la table d'historique
@@ -493,8 +584,8 @@ function renderHistory() {
       <td class="highlight">${record.solutions}</td>
       <td>${record.munition}</td>
       <td>
-        <button class="btn btn-small btn-success" onclick="loadRecord(${record.id})">${t.btnLoad || 'LOAD'}</button>
-        <button class="btn btn-small btn-danger" onclick="deleteRecord(${record.id})">${t.btnDelete || 'DEL'}</button>
+        <button class="btn btn-small btn-success" onclick="loadRecord('${record.id}')">${t.btnLoad || 'LOAD'}</button>
+        <button class="btn btn-small btn-danger" onclick="deleteRecord('${record.id}')">${t.btnDelete || 'DEL'}</button>
       </td>
     `;
     historyBody.appendChild(tr);
