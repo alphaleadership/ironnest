@@ -1,4 +1,8 @@
 import './style.css';
+import { translations } from './i18n.js';
+
+// Gestion de la langue (i18n)
+let currentLang = localStorage.getItem('ironnest_lang') || 'fr';
 
 // Références des éléments du DOM
 const nestColSel = document.getElementById('nest-col');
@@ -33,6 +37,10 @@ const mapModeTargetBtn = document.getElementById('map-mode-target');
 
 const sysTimeDisplay = document.getElementById('sys-time');
 
+// Langue boutons
+const btnLangFr = document.getElementById('lang-fr');
+const btnLangEn = document.getElementById('lang-en');
+
 // Constantes pour la grille
 const COLUMNS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
 let mapMode = 'nest'; // 'nest' ou 'target'
@@ -40,11 +48,45 @@ let mapMode = 'nest'; // 'nest' ou 'target'
 // Charger l'historique initial
 let targetHistory = JSON.parse(localStorage.getItem('ironnest_history') || '[]');
 
+// Fonction d'application de la langue
+function applyLanguage() {
+  const t = translations[currentLang];
+  
+  // Parcourir tous les éléments ayant l'attribut data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key]) {
+      if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+        // Pour les options de select
+        if (el.placeholder) el.placeholder = t[key];
+      } else {
+        el.innerHTML = t[key];
+      }
+    }
+  });
+
+  // Mettre à jour la classe active sur les boutons de langue
+  if (currentLang === 'fr') {
+    btnLangFr.classList.add('active');
+    btnLangEn.classList.remove('active');
+    document.documentElement.lang = 'fr';
+  } else {
+    btnLangEn.classList.add('active');
+    btnLangFr.classList.remove('active');
+    document.documentElement.lang = 'en';
+  }
+
+  // Recalculer les textes dynamiques
+  calculateBalistics();
+  renderHistory();
+}
+
 // Mettre à jour l'horloge système
 function updateClock() {
   const now = new Date();
   const format = (n) => String(n).padStart(2, '0');
-  sysTimeDisplay.textContent = `SYS.TIME: ${format(now.getHours())}:${format(now.getMinutes())}:${format(now.getSeconds())}`;
+  const t = translations[currentLang];
+  sysTimeDisplay.textContent = `${t.systime || 'SYS.TIME'}: ${format(now.getHours())}:${format(now.getMinutes())}:${format(now.getSeconds())}`;
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -77,7 +119,7 @@ function calculateBalistics() {
   nestDisplay.textContent = formatCoord(nestCol, nestRow, nestSubX, nestSubY);
   targetDisplay.textContent = formatCoord(targetCol, targetRow, targetSubX, targetSubY);
 
-  // Coordonnées globales en dizaine de mètres (chaque sous-case fait 100m, donc 1 unité globale = 100m)
+  // Coordonnées globales
   const nest = getGlobalCoords(nestCol, nestRow, nestSubX, nestSubY);
   const target = getGlobalCoords(targetCol, targetRow, targetSubX, targetSubY);
 
@@ -88,8 +130,7 @@ function calculateBalistics() {
   const distanceKm = Math.sqrt(dx * dx + dy * dy) * 0.1;
   const distanceMeters = Math.round(distanceKm * 1000);
 
-  // Gisement (Bearing) en degrés (Nord = 0°, Est = 90°, etc.)
-  // dy positif va vers le haut (Nord), dx positif vers la droite (Est)
+  // Gisement (Bearing) en degrés
   let bearingRad = Math.atan2(dx, dy);
   let bearingDeg = bearingRad * (180 / Math.PI);
   if (bearingDeg < 0) {
@@ -100,7 +141,7 @@ function calculateBalistics() {
   distanceDisplay.textContent = `${distanceKm.toFixed(2)} km`;
   bearingDisplay.textContent = `${bearingDeg.toFixed(1)}°`;
 
-  // Mettre à jour l'aiguille de la boussole (tourne selon le gisement)
+  // Mettre à jour l'aiguille de la boussole
   needle.style.transform = `translate(-50%, -50%) rotate(${bearingDeg}deg)`;
 
   // Mettre à jour la table des élévations
@@ -116,27 +157,29 @@ function calculateBalistics() {
 // Mettre à jour la table d'élévation
 function updateElevationTable(distKm) {
   elevationTableBody.innerHTML = '';
+  const t = translations[currentLang];
   
-  // Dans le jeu, on peut utiliser de 1 à 6 charges
   for (let charges = 1; charges <= 6; charges++) {
     const elevation = (12 / charges) * distKm;
     let statusClass = 'status-stable';
-    let statusText = 'Excellent';
+    let statusText = t.statExcellent || 'Excellent';
 
     if (elevation > 85) {
       statusClass = 'status-danger';
-      statusText = 'Trop proche / Impossible';
+      statusText = t.statTooClose || 'Too close';
     } else if (elevation < 3) {
       statusClass = 'status-warning';
-      statusText = 'Portée max dépassée';
+      statusText = t.statMaxRange || 'Max range exceeded';
     } else if (elevation > 65) {
       statusClass = 'status-warning';
-      statusText = 'Dispersion élevée';
+      statusText = t.statHighDispersion || 'High dispersion';
     }
+
+    const labelCharges = charges === 1 ? (t.chargeSingular || 'Charge') : (t.chargePlural || 'Charges');
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${charges} ${charges === 1 ? 'Charge' : 'Charges'}</td>
+      <td>${charges} ${labelCharges}</td>
       <td class="highlight-amber">${elevation > 85 ? 'N/A' : elevation.toFixed(2) + '°'}</td>
       <td class="${statusClass}">${statusText}</td>
     `;
@@ -147,13 +190,14 @@ function updateElevationTable(distKm) {
 // Recommandations d'obus
 function updateOrdnanceRecommendation() {
   const targetType = ordnanceTypeSel.value;
+  const t = translations[currentLang];
   let text = '';
   if (targetType === 'surface') {
-    text = 'Recommandation : <span class="highlight-text" style="color: #00ff66;">HE (High Explosive)</span> - Idéal pour infanterie et blindés légers sans abri.';
+    text = t.recHe;
   } else if (targetType === 'bunker') {
-    text = 'Recommandation : <span class="highlight-text" style="color: #ff3333;">AP (Armor Piercing)</span> - Requis pour percer les toits de bunkers et blindages lourds.';
+    text = t.recAp;
   } else {
-    text = 'Recommandation : <span class="highlight-text" style="color: #ff9900;">SMOKE (Fumigène)</span> - Pour masquer les mouvements alliés ou aveugler les vigies.';
+    text = t.recSmoke;
   }
   ordnanceRecommendation.innerHTML = text;
 }
@@ -164,9 +208,10 @@ function drawMap(nest, target) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
+  const t = translations[currentLang];
 
   // Effacer
-  ctx.fillStyle = '#06070a';
+  ctx.fillStyle = '#050608';
   ctx.fillRect(0, 0, w, h);
 
   // Dessiner la grille 20x10
@@ -174,7 +219,7 @@ function drawMap(nest, target) {
   const cellH = h / 10;
 
   // Lignes verticales
-  ctx.strokeStyle = 'rgba(0, 255, 102, 0.1)';
+  ctx.strokeStyle = 'rgba(57, 255, 20, 0.08)';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 20; i++) {
     ctx.beginPath();
@@ -192,22 +237,17 @@ function drawMap(nest, target) {
   }
 
   // Affichage des index A..T et 1..10
-  ctx.fillStyle = 'rgba(0, 255, 102, 0.4)';
-  ctx.font = '10px Share Tech Mono';
+  ctx.fillStyle = 'rgba(57, 255, 20, 0.4)';
+  ctx.font = '11px Share Tech Mono';
   for (let i = 0; i < 20; i++) {
-    ctx.fillText(COLUMNS[i], i * cellW + 4, 12);
+    ctx.fillText(COLUMNS[i], i * cellW + 4, 14);
   }
   for (let j = 0; j < 10; j++) {
-    // 10 en haut, 1 en bas
     ctx.fillText(String(10 - j), 4, j * cellH + cellH - 4);
   }
 
-  // Tracer la ligne de visée (si nest et target sont définis)
+  // Tracer la ligne de visée
   if (nest && target) {
-    // Convertir les coordonnées globales en pixels canvas
-    // Rappel : global X va de 0 à 200, Y de 0 à 100.
-    // Ligne 1 est Y global 0..9, Ligne 10 est Y global 90..99
-    // Le canvas a Y=0 en haut, donc Y_canvas = h - (Y_global / 100) * h
     const nestPixelX = (nest.x / 200) * w;
     const nestPixelY = h - (nest.y / 100) * h;
     const targetPixelX = (target.x / 200) * w;
@@ -215,7 +255,7 @@ function drawMap(nest, target) {
 
     // Ligne pointillée
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255, 153, 0, 0.5)';
+    ctx.strokeStyle = 'rgba(255, 170, 0, 0.5)';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
     ctx.moveTo(nestPixelX, nestPixelY);
@@ -226,7 +266,7 @@ function drawMap(nest, target) {
     // Dessiner le Nest (Vert)
     ctx.beginPath();
     ctx.arc(nestPixelX, nestPixelY, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#00ff66';
+    ctx.fillStyle = '#39ff14';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
@@ -238,14 +278,14 @@ function drawMap(nest, target) {
     ctx.lineTo(nestPixelX + 12, nestPixelY);
     ctx.moveTo(nestPixelX, nestPixelY - 12);
     ctx.lineTo(nestPixelX, nestPixelY + 12);
-    ctx.strokeStyle = '#00ff66';
+    ctx.strokeStyle = '#39ff14';
     ctx.lineWidth = 1;
     ctx.stroke();
 
     // Dessiner la Cible (Rouge)
     ctx.beginPath();
     ctx.arc(targetPixelX, targetPixelY, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff3333';
+    ctx.fillStyle = '#ff3b30';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5;
@@ -257,14 +297,14 @@ function drawMap(nest, target) {
     ctx.lineTo(targetPixelX + 14, targetPixelY);
     ctx.moveTo(targetPixelX, targetPixelY - 14);
     ctx.lineTo(targetPixelX, targetPixelY + 14);
-    ctx.strokeStyle = '#ff3333';
+    ctx.strokeStyle = '#ff3b30';
     ctx.lineWidth = 1;
     ctx.stroke();
 
     // Cercle d'aide de portée autour de la cible
     ctx.beginPath();
     ctx.arc(targetPixelX, targetPixelY, 15, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 51, 51, 0.4)';
+    ctx.strokeStyle = 'rgba(255, 59, 48, 0.4)';
     ctx.stroke();
   }
 }
@@ -276,28 +316,28 @@ function handleMapInteraction(e) {
   const scaleY = canvas.height / rect.height;
   const x = (e.clientX - rect.left) * scaleX;
   const y = (e.clientY - rect.top) * scaleY;
+  const t = translations[currentLang];
 
   // Calculer la case de la grille
   const colIndex = Math.floor(x / (canvas.width / 20));
-  const rowIndex = 10 - Math.floor(y / (canvas.height / 10)); // Ligne 1 en bas, 10 en haut
+  const rowIndex = 10 - Math.floor(y / (canvas.height / 10));
 
-  // Calculer la coordonnée fine (sub-cell)
+  // Calculer la coordonnée fine
   const cellW = canvas.width / 20;
   const cellH = canvas.height / 10;
   const relativeX = x % cellW;
   const relativeY = y % cellH;
 
   const subX = Math.floor((relativeX / cellW) * 10);
-  const subY = 9 - Math.floor((relativeY / cellH) * 10); // 9 en haut, 0 en bas
+  const subY = 9 - Math.floor((relativeY / cellH) * 10);
 
-  // Limiter
   const finalCol = Math.max(0, Math.min(19, colIndex));
   const finalRow = Math.max(1, Math.min(10, rowIndex));
   const finalSubX = Math.max(0, Math.min(9, subX));
   const finalSubY = Math.max(0, Math.min(9, subY));
 
   if (e.type === 'mousemove') {
-    cursorCoordDisplay.textContent = `Curseur: ${formatCoord(finalCol, finalRow, finalSubX, finalSubY)}`;
+    cursorCoordDisplay.textContent = `${t.cursor || 'Cursor'}: ${formatCoord(finalCol, finalRow, finalSubX, finalSubY)}`;
   } else if (e.type === 'click') {
     if (mapMode === 'nest') {
       nestColSel.value = finalCol;
@@ -317,7 +357,8 @@ function handleMapInteraction(e) {
 canvas.addEventListener('mousemove', handleMapInteraction);
 canvas.addEventListener('click', handleMapInteraction);
 canvas.addEventListener('mouseleave', () => {
-  cursorCoordDisplay.textContent = 'Curseur: --';
+  const t = translations[currentLang];
+  cursorCoordDisplay.textContent = `${t.cursor || 'Cursor'}: --`;
 });
 
 // Gérer le changement de mode de clic sur la carte
@@ -395,7 +436,6 @@ btnSave.addEventListener('click', () => {
     bearing: `${bearingDeg.toFixed(1)}°`,
     solutions: solutions.join(' | ') || 'Hors limite',
     munition: ordnanceTypeSel.value.toUpperCase(),
-    // Sauvegarder les valeurs brutes pour rechargement
     raw: {
       nestCol, nestRow, nestSubX, nestSubY,
       targetCol, targetRow, targetSubX, targetSubY
@@ -403,7 +443,7 @@ btnSave.addEventListener('click', () => {
   };
 
   targetHistory.unshift(newRecord);
-  if (targetHistory.length > 20) targetHistory.pop(); // Limite à 20 entrées
+  if (targetHistory.length > 20) targetHistory.pop();
   localStorage.setItem('ironnest_history', JSON.stringify(targetHistory));
   renderHistory();
 });
@@ -436,8 +476,9 @@ window.deleteRecord = function(id) {
 // Rendre la table d'historique
 function renderHistory() {
   historyBody.innerHTML = '';
+  const t = translations[currentLang];
   if (targetHistory.length === 0) {
-    historyBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-dim);">Aucune cible enregistrée pour le moment.</td></tr>`;
+    historyBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-dim);">${t.histEmpty || 'No targets.'}</td></tr>`;
     return;
   }
 
@@ -452,14 +493,26 @@ function renderHistory() {
       <td class="highlight">${record.solutions}</td>
       <td>${record.munition}</td>
       <td>
-        <button class="btn btn-small btn-success" onclick="loadRecord(${record.id})">CHARGER</button>
-        <button class="btn btn-small btn-danger" onclick="deleteRecord(${record.id})">SUPPR</button>
+        <button class="btn btn-small btn-success" onclick="loadRecord(${record.id})">${t.btnLoad || 'LOAD'}</button>
+        <button class="btn btn-small btn-danger" onclick="deleteRecord(${record.id})">${t.btnDelete || 'DEL'}</button>
       </td>
     `;
     historyBody.appendChild(tr);
   });
 }
 
+// Événements boutons de langue
+btnLangFr.addEventListener('click', () => {
+  currentLang = 'fr';
+  localStorage.setItem('ironnest_lang', 'fr');
+  applyLanguage();
+});
+
+btnLangEn.addEventListener('click', () => {
+  currentLang = 'en';
+  localStorage.setItem('ironnest_lang', 'en');
+  applyLanguage();
+});
+
 // Initialisation au chargement
-calculateBalistics();
-renderHistory();
+applyLanguage();

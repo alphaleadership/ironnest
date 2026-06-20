@@ -19,24 +19,32 @@
           <span class="led green blinking" id="led-status"></span>
           <span class="led amber" id="led-calc"></span>
         </div>
-        <h1 class="console-title">IRON NEST // CALCULATEUR BALISTIQUE</h1>
-        <div class="system-time" id="sys-time">SYS.TIME: 07:25:28</div>
+        <h1 class="console-title" data-i18n="title">IRON NEST // CALCULATEUR BALISTIQUE</h1>
+        <div class="header-right">
+          <!-- Sélecteur de Langue -->
+          <div class="lang-selector">
+            <button id="lang-fr" class="btn-lang active">FR</button>
+            <span class="lang-divider">|</span>
+            <button id="lang-en" class="btn-lang">EN</button>
+          </div>
+          <div class="system-time" id="sys-time">SYS.TIME: 07:25:28</div>
+        </div>
       </header>
 
       <main class="console-body">
         <!-- Section gauche : Paramètres et Entrées -->
         <section class="control-panel panel-left" aria-labelledby="input-heading">
           <div class="panel-header">
-            <h2 id="input-heading">COORDONNÉES DE TIR</h2>
+            <h2 id="input-heading" data-i18n="panelCoords">COORDONNÉES DE TIR</h2>
           </div>
           
           <div class="panel-content">
             <!-- Position Iron Nest -->
             <fieldset class="coord-group" id="nest-coords-group">
-              <legend>POSITION DE L'IRON NEST</legend>
+              <legend data-i18n="nestPos">POSITION DE L'IRON NEST</legend>
               <div class="inputs-row">
                 <div class="input-field">
-                  <label for="nest-col">COL (A-T)</label>
+                  <label for="nest-col" data-i18n="column">COL (A-T)</label>
                   <select id="nest-col" class="custom-select">
                     <option value="0">A</option><option value="1">B</option><option value="2">C</option>
                     <option value="3">D</option><option value="4">E</option><option value="5">F</option>
@@ -49,7 +57,7 @@
                 </div>
                 
                 <div class="input-field">
-                  <label for="nest-row">LIGNE (1-10)</label>
+                  <label for="nest-row" data-i18n="row">LIGNE (1-10)</label>
                   <select id="nest-row" class="custom-select">
                     <option value="1">1</option><option value="2">2</option><option value="3">3</option>
                     <option value="4">4</option><option value="5" selected>5</option><option value="6">6</option>
@@ -59,12 +67,12 @@
                 </div>
 
                 <div class="input-field">
-                  <label for="nest-sub-x">SUB X (0-9)</label>
+                  <label for="nest-sub-x" data-i18n="subX">SUB X (0-9)</label>
                   <input type="number" id="nest-sub-x" min="0" max="9" value="0" class="custom-input">
                 </div>
 
                 <div class="input-field">
-                  <label for="nest-sub-y">SUB Y (0-9)</label>
+                  <label for="nest-sub-y" data-i18n="subY">SUB Y (0-9)</label>
                   <input type="number" id="nest-sub-y" min="0" max="9" value="0" class="custom-input">
                 </div>
               </div>
@@ -73,10 +81,10 @@
 
             <!-- Position Target -->
             <fieldset class="coord-group" id="target-coords-group">
-              <legend>POSITION DE LA CIBLE</legend>
+              <legend data-i18n="targetPos">POSITION DE LA CIBLE</legend>
               <div class="inputs-row">
                 <div class="input-field">
-                  <label for="target-col">COL (A-T)</label>
+                  <label for="target-col" data-i18n="column">COL (A-T)</label>
                   <select id="target-col" class="custom-select">
                     <option value="0">A</option><option value="1">B</option><option value="2">C</option>
                     <option value="3">D</option><option value="4">E</option><option value="5">F</option>
@@ -89,7 +97,7 @@
                 </div>
                 
                 <div class="input-field">
-                  <label for="target-row">LIGNE (1-10)</label>
+                  <label for="target-row" data-i18n="row">LIGNE (1-10)</label>
                   <select id="target-row" class="custom-select">
                     <option value="1">1</option><option value="2">2</option><option value="3">3</option>
                     <option value="4">4</option><option value="5">5</option><option value="6" selected>6</option>
@@ -99,12 +107,12 @@
                 </div>
 
                 <div class="input-field">
-                  <label for="target-sub-x">SUB X (0-9)</label>
+                  <label for="target-sub-x" data-i18n="subX">SUB X (0-9)</label>
                   <input type="number" id="target-sub-x" min="0" max="9" value="0" class="custom-input">
                 </div>
 
                 <div class="input-field">
-                  <label for="target-sub-y">SUB Y (0-9)</label>
+                  <label for="target-sub-y" data-i18n="subY">SUB Y (0-9)</label>
                   <input type="number" id="target-sub-y" min="0" max="9" value="0" class="custom-input">
                 </div>
               </div>
@@ -113,14 +121,14 @@
 
             <!-- Type d'obus -->
             <div class="ordnance-selection card-bg">
-              <h3>MUNITIONS & PORTÉE</h3>
+              <h3 data-i18n="ordnanceTitle">MUNITIONS & PORTÉE</h3>
               <div class="inputs-row">
                 <div class="input-field full-width">
-                  <label for="ordnance-type">TYPE DE CIBLE / IMPACT</label>
+                  <label for="ordnance-type" data-i18n="targetTypeLabel">TYPE DE CIBLE / IMPACT</label>
                   <select id="ordnance-type" class="custom-select">
-                    <option value="surface">Blindé / Infanterie en Surface (Recommande HE)</option>
-                    <option value="bunker">Bunker / Fortification Blindée (Recommande AP)</option>
-                    <option value="smoke">Écran Tactique (Recommande FUMIGÈNE)</option>
+                    <option value="surface" data-i18n="targetSurface">Blindé / Infanterie en Surface (Recommande HE)</option>
+                    <option value="bunker" data-i18n="targetBunker">Bunker / Fortification Blindée (Recommande AP)</option>
+                    <option value="smoke" data-i18n="targetSmoke">Écran Tactique (Recommande FUMIGÈNE)</option>
                   </select>
                 </div>
               </div>
@@ -131,8 +139,8 @@
 
             <!-- Boutons -->
             <div class="buttons-grid">
-              <button id="btn-reset" class="btn btn-danger">RÉINITIALISER</button>
-              <button id="btn-save" class="btn btn-success">ENREGISTRER LA CIBLE</button>
+              <button id="btn-reset" class="btn btn-danger" data-i18n="btnReset">RÉINITIALISER</button>
+              <button id="btn-save" class="btn btn-success" data-i18n="btnSave">ENREGISTRER LA CIBLE</button>
             </div>
           </div>
         </section>
@@ -140,17 +148,17 @@
         <!-- Section centrale : Carte interactive -->
         <section class="control-panel panel-center" aria-labelledby="map-heading">
           <div class="panel-header">
-            <h2 id="map-heading">CARTE DES OPÉRATIONS (20x10)</h2>
+            <h2 id="map-heading" data-i18n="mapTitle">CARTE DES OPÉRATIONS (20x10)</h2>
             <div class="map-controls">
-              <button id="map-mode-nest" class="btn btn-small active">Placer Nest</button>
-              <button id="map-mode-target" class="btn btn-small">Placer Cible</button>
+              <button id="map-mode-nest" class="btn btn-small active" data-i18n="mapModeNest">Placer Nest</button>
+              <button id="map-mode-target" class="btn btn-small" data-i18n="mapModeTarget">Placer Cible</button>
             </div>
           </div>
           <div class="panel-content map-wrapper">
             <canvas id="tactical-map" width="800" height="400"></canvas>
             <div class="map-legend">
               <span class="legend-item"><span class="marker nest"></span> Iron Nest</span>
-              <span class="legend-item"><span class="marker target"></span> Cible</span>
+              <span class="legend-item"><span class="marker target"></span> <span data-i18n="histTarget">Cible</span></span>
               <span class="legend-display" id="coord-under-cursor">Curseur: --</span>
             </div>
           </div>
@@ -159,12 +167,12 @@
         <!-- Section droite : Résultats balistiques -->
         <section class="control-panel panel-right" aria-labelledby="results-heading">
           <div class="panel-header">
-            <h2 id="results-heading">SOLUTIONS BALISTIQUES</h2>
+            <h2 id="results-heading" data-i18n="solutionsTitle">SOLUTIONS BALISTIQUES</h2>
           </div>
           <div class="panel-content balistics-layout">
             <!-- Boussole -->
             <div class="compass-container card-bg">
-              <h3>BOUSSOLE DE GISEMENT</h3>
+              <h3 data-i18n="compassTitle">BOUSSOLE DE GISEMENT</h3>
               <div class="compass-wrapper">
                 <div class="compass-ring" id="compass-ring">
                   <div class="compass-card">
@@ -179,11 +187,11 @@
               </div>
               <div class="compass-readout">
                 <div class="readout-box">
-                  <span class="readout-label">GISEMENT (BEARING)</span>
+                  <span class="readout-label" data-i18n="bearing">GISEMENT (BEARING)</span>
                   <span class="readout-value highlight-amber" id="bearing-value">045.0°</span>
                 </div>
                 <div class="readout-box">
-                  <span class="readout-label">DISTANCE (RANGE)</span>
+                  <span class="readout-label" data-i18n="distance">DISTANCE (RANGE)</span>
                   <span class="readout-value highlight-amber" id="distance-value">1.41 km</span>
                 </div>
               </div>
@@ -191,13 +199,13 @@
 
             <!-- Table d'élévation -->
             <div class="elevation-table-wrapper card-bg">
-              <h3>TABLE DES ÉLÉVATIONS REQUISES</h3>
+              <h3 data-i18n="tableTitle">TABLE DES ÉLÉVATIONS REQUISES</h3>
               <table class="elevation-table" id="elevation-table">
                 <thead>
                   <tr>
-                    <th>CHARGES</th>
-                    <th>ÉLÉVATION (DEG)</th>
-                    <th>STABILITÉ</th>
+                    <th data-i18n="chargesHeader">CHARGES</th>
+                    <th data-i18n="elevationHeader">ÉLÉVATION (DEG)</th>
+                    <th data-i18n="stabilityHeader">STABILITÉ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -215,19 +223,19 @@
       <!-- Historique des cibles enregistrées -->
       <footer class="console-footer">
         <section class="history-panel" aria-labelledby="history-heading">
-          <h2 id="history-heading">JOURNAL DES MISSIONS & CIBLES ENREGISTRÉES</h2>
+          <h2 id="history-heading" data-i18n="historyTitle">JOURNAL DES MISSIONS & CIBLES ENREGISTRÉES</h2>
           <div class="table-scroll-container">
             <table class="history-table" id="history-table">
               <thead>
                 <tr>
-                  <th>DATE/HEURE</th>
-                  <th>NEST</th>
-                  <th>CIBLE</th>
-                  <th>DISTANCE</th>
-                  <th>GISEMENT</th>
-                  <th>SOLUTIONS (Charges / Élev.)</th>
-                  <th>MUNITION</th>
-                  <th>ACTION</th>
+                  <th data-i18n="histDate">DATE/HEURE</th>
+                  <th data-i18n="histNest">NEST</th>
+                  <th data-i18n="histTarget">CIBLE</th>
+                  <th data-i18n="histDistance">DISTANCE</th>
+                  <th data-i18n="histBearing">GISEMENT</th>
+                  <th data-i18n="histSolutions">SOLUTIONS (Charges / Élev.)</th>
+                  <th data-i18n="histMunition">MUNITION</th>
+                  <th data-i18n="histAction">ACTION</th>
                 </tr>
               </thead>
               <tbody id="history-body">
